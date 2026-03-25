@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visiting Card Organizer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="importmap">
+{"imports": {"@google/generative-ai": "https://esm.run/@google/generative-ai"}}
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090d;--s1:#0f1318;--s2:#161c24;--s3:#1c2530;
+  --b1:#1e2a38;--b2:#263548;
+  --blue:#3b9eff;--teal:#00d4aa;--gold:#f5a623;
+  --green:#2ecc71;--red:#e74c3c;--purple:#8b5cf6;
+  --text:#dde6f0;--dim:#6b8399;--dim2:#9ab0c4;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+
+/* HEADER */
+.hdr{padding:1rem 1.5rem;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;background:var(--s1)}
+.brand{display:flex;align-items:center;gap:.6rem}
+.brand-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
+.brand h1{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--blue)}
+.brand p{font-size:.65rem;color:var(--dim2);margin-top:1px}
+.hdr-right{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.key-wrap{display:flex;align-items:center;gap:.35rem;background:var(--s2);border:1px solid var(--b2);border-radius:7px;padding:.3rem .7rem;transition:border-color .2s}
+.key-wrap:focus-within{border-color:var(--blue)}
+.key-wrap.saved{border-color:var(--green)}
+.key-wrap span{font-size:.65rem;color:var(--dim2);white-space:nowrap}
+.key-wrap input{background:none;border:none;outline:none;color:var(--text);font-size:.73rem;width:180px;font-family:'DM Sans',sans-serif}
+.key-toggle{background:none;border:none;cursor:pointer;color:var(--dim2);font-size:.75rem;padding:0 .15rem;line-height:1;transition:color .15s}
+.key-toggle:hover{color:var(--text)}
+.key-save{background:var(--blue);border:none;cursor:pointer;color:#fff;font-size:.65rem;font-family:'DM Sans',sans-serif;font-weight:600;border-radius:4px;padding:.2rem .5rem;white-space:nowrap;transition:background .15s}
+.key-save:hover{background:#5bb3ff}
+.key-saved-badge{font-size:.62rem;color:var(--green);white-space:nowrap;display:none}
+.key-saved-badge.on{display:inline}
+.provider-sel{background:var(--s3);border:1px solid var(--b2);color:var(--dim2);font-size:.65rem;font-family:'DM Sans',sans-serif;border-radius:4px;padding:.2rem .4rem;cursor:pointer;outline:none}
+.provider-sel:focus{border-color:var(--blue)}
+
+/* BUTTONS */
+.btn{border:none;cursor:pointer;border-radius:7px;font-family:'DM Sans',sans-serif;font-weight:500;font-size:.82rem;transition:all .18s;display:inline-flex;align-items:center;gap:.35rem;padding:.48rem .95rem;white-space:nowrap}
+.btn-blue{background:linear-gradient(135deg,var(--blue),#5bb3ff);color:#fff}
+.btn-blue:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(59,158,255,.3)}
+.btn-green{background:linear-gradient(135deg,#1a9e52,var(--green));color:#fff}
+.btn-green:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(46,204,113,.3)}
+.btn-ghost{background:var(--s2);border:1px solid var(--b2);color:var(--text)}
+.btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+.btn-del{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.25);color:var(--red);padding:.32rem .7rem;font-size:.74rem}
+.btn-sm{padding:.3rem .65rem!important;font-size:.72rem!important}
+
+/* MAIN */
+.main{max-width:1280px;margin:0 auto;padding:1.5rem}
+
+/* UPLOAD */
+.drop{border:2px dashed var(--b2);border-radius:12px;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:all .25s;background:var(--s1);margin-bottom:1.25rem}
+.drop:hover,.drop.over{border-color:var(--blue);background:var(--s2);box-shadow:0 0 0 1px rgba(59,158,255,.12)}
+.drop input{display:none}
+.drop-icon{font-size:2rem;margin-bottom:.4rem}
+.drop h2{font-size:1rem;font-weight:600;margin-bottom:.2rem}
+.drop p{font-size:.78rem;color:var(--dim2)}
+.drop-hint{margin-top:.6rem;display:inline-flex;align-items:center;gap:.3rem;background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.2);color:var(--blue);border-radius:100px;padding:.25rem .75rem;font-size:.68rem}
+
+/* PROGRESS PANEL */
+.prog-panel{background:var(--s1);border:1px solid var(--b1);border-radius:12px;padding:1.1rem;margin-bottom:1.25rem;display:none}
+.prog-panel.on{display:block}
+.prog-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem}
+.prog-top h3{font-size:.88rem;font-weight:600;color:var(--blue)}
+.prog-bar-wrap{margin-bottom:.75rem}
+.prog-lbl{display:flex;justify-content:space-between;font-size:.7rem;color:var(--dim2);margin-bottom:.28rem}
+.prog-bar{height:5px;background:var(--b1);border-radius:100px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:100px;transition:width .35s;width:0}
+
+/* IMAGE THUMBS */
+.thumb-row{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem}
+.th{position:relative;width:88px;border-radius:6px;overflow:hidden;border:2px solid var(--b1);flex-shrink:0}
+.th img{width:100%;height:56px;object-fit:cover;display:block}
+.th-overlay{position:absolute;inset:0;background:rgba(7,9,13,.5);display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.th-label{position:absolute;bottom:0;left:0;right:0;background:rgba(7,9,13,.88);color:var(--dim2);font-size:.52rem;padding:2px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th.scanning{border-color:var(--gold)}
+.th.matched{border-color:var(--green)}
+.th.alone{border-color:var(--dim)}
+.th.failed{border-color:var(--red)}
+
+.prog-status{font-size:.78rem;color:var(--dim2);margin-top:.5rem}
+.prog-actions{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
+
+/* CARDS */
+.cards-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem}
+.cards-header h2{font-family:'Playfair Display',serif;font-size:1.15rem}
+.badge{background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.2);color:var(--blue);border-radius:100px;padding:.15rem .6rem;font-size:.68rem}
+
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:11px;margin-bottom:.9rem;overflow:hidden;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card:hover{border-color:var(--b2)}
+.card-head{display:flex;justify-content:space-between;align-items:center;padding:.65rem .9rem;background:var(--s2);border-bottom:1px solid var(--b1)}
+.card-head-left{display:flex;align-items:center;gap:.55rem}
+.card-num{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:#fff;flex-shrink:0}
+.card-title{font-weight:600;font-size:.84rem}
+.card-sub{font-size:.68rem;color:var(--dim2);margin-top:1px}
+.card-body{display:flex;gap:.9rem;padding:.9rem;flex-wrap:wrap}
+
+/* IMAGES */
+.card-imgs{display:flex;flex-direction:column;gap:.45rem;flex-shrink:0}
+.img-box{width:170px;border-radius:8px;overflow:hidden;border:1px solid var(--b2);position:relative;background:var(--s3)}
+.img-box img{width:100%;display:block}
+.img-box-label{position:absolute;top:4px;left:4px;background:rgba(7,9,13,.82);color:var(--teal);font-size:.54rem;font-weight:700;letter-spacing:.07em;border-radius:3px;padding:2px 5px;text-transform:uppercase}
+.img-box-single{width:170px;border-radius:8px;overflow:hidden;border:1px solid var(--b2);position:relative;background:var(--s3)}
+.img-box-single img{width:100%;display:block}
+
+/* FIELDS */
+.card-fields{flex:1;min-width:220px}
+.field-status{display:flex;align-items:center;gap:.4rem;font-size:.68rem;margin-bottom:.4rem;color:var(--dim2)}
+.field-status.loading{color:var(--gold)}
+.field-status.done{color:var(--green)}
+.field-status.fail{color:var(--red)}
+.spin{width:11px;height:11px;border:2px solid rgba(245,166,35,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:.42rem}
+.field{display:flex;flex-direction:column;gap:.15rem}
+.field.wide{grid-column:1/-1}
+.field label{font-size:.58rem;color:var(--dim);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.field input{background:var(--s3);border:1px solid var(--b2);color:var(--text);border-radius:6px;padding:.36rem .6rem;font-family:'DM Sans',sans-serif;font-size:.76rem;width:100%;transition:border-color .18s}
+.field input:focus{outline:none;border-color:var(--blue)}
+.field input::placeholder{color:var(--dim);opacity:.5}
+
+/* EXCEL TABLE */
+.excel-wrap{background:var(--s1);border:1px solid var(--b1);border-radius:11px;margin-bottom:1.25rem;overflow:hidden;display:none}
+.excel-wrap.on{display:block}
+.excel-head{display:flex;justify-content:space-between;align-items:center;padding:.65rem 1rem;background:var(--s2);border-bottom:1px solid var(--b1);flex-wrap:wrap;gap:.4rem}
+.excel-head h3{font-size:.82rem;font-weight:600;color:var(--green)}
+.tbl-scroll{overflow-x:auto;max-height:260px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:.7rem}
+thead th{background:#0a1e30;color:var(--teal);padding:.42rem .6rem;text-align:left;white-space:nowrap;border-bottom:1px solid var(--b2);font-size:.63rem;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;z-index:1}
+tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
+tbody tr:hover{background:rgba(59,158,255,.04)}
+tbody td{padding:.38rem .6rem;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--b1)}
+tbody td:first-child{color:var(--dim2);font-size:.65rem}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;background:var(--s3);border:1px solid var(--b2);border-radius:9px;padding:.65rem .9rem;font-size:.78rem;box-shadow:0 6px 24px rgba(0,0,0,.5);transform:translateY(12px);opacity:0;transition:all .28s;pointer-events:none;max-width:280px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{border-color:rgba(46,204,113,.4)}
+.toast.err{border-color:rgba(231,76,60,.4)}
+
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--dim);display:none}
+.empty-state.on{display:block}
+.empty-state .icon{font-size:2rem;opacity:.25;margin-bottom:.6rem}
+
+@media(max-width:560px){
+  .main{padding:.85rem}
+  .card-body{flex-direction:column}
+  .img-box,.img-box-single{width:100%}
+  .fields{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="brand">
+    <div class="brand-icon">🪪</div>
+    <div>
+      <h1>Visiting Card Organizer</h1>
+      <p>Upload images → AI reads & matches → Excel export</p>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="key-wrap" id="keyWrap" onclick="event.stopPropagation()">
+      <select class="provider-sel" id="apiProvider" onclick="event.stopPropagation()" onchange="try{localStorage.setItem('vc_p',this.value)}catch(e){}">
+        <option value="anthropic">Claude</option>
+        <option value="gemini">Gemini</option>
+      </select>
+      <span>🔑</span>
+      <input type="password" id="apiKey" placeholder="Paste API key, then click Save"
+        onclick="event.stopPropagation()"
+        onkeydown="if(event.key==='Enter')saveKey()">
+      <button class="key-toggle" onclick="event.stopPropagation();toggleKeyVisibility()" title="Show/hide">👁</button>
+      <button class="key-save" onclick="event.stopPropagation();saveKey()">Save</button>
+      <button class="key-save" style="background:var(--s3);border:1px solid var(--b2);color:var(--dim2)" onclick="event.stopPropagation();testKey()">Test</button>
+      <span class="key-saved-badge" id="keySavedBadge">✓ Saved</span>
+    </div>
+    <button class="btn btn-green" id="xlBtn" onclick="exportExcel()" style="display:none">📊 Download Excel</button>
+    <button class="btn btn-ghost" id="clrBtn" onclick="clearAll()" style="display:none">🗑 Clear All</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- UPLOAD -->
+  <div class="drop" id="dropZone"
+    onclick="document.getElementById('fileIn').click()"
+    ondragover="event.preventDefault();this.classList.add('over')"
+    ondragleave="this.classList.remove('over')"
+    ondrop="event.preventDefault();this.classList.remove('over');processFiles(event.dataTransfer.files)">
+    <input type="file" id="fileIn" accept="image/*" multiple onchange="processFiles(this.files);this.value=''">
+    <div class="drop-icon">🪪</div>
+    <h2>Click or Drop All Visiting Card Images Here</h2>
+    <p>Any order — front and back mixed — AI will match them automatically</p>
+    <div class="drop-hint">🧠 AI reads each card's name & phone → matches front+back → fills Excel</div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="prog-panel" id="progPanel">
+    <div class="prog-top">
+      <h3 id="progTitle">🔍 Reading Cards...</h3>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('fileIn').click()">+ Add More Images</button>
+    </div>
+    <div class="prog-bar-wrap">
+      <div class="prog-lbl"><span id="progLbl">Starting...</span><span id="progNum">0 / 0</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+    </div>
+    <div class="thumb-row" id="thumbRow"></div>
+    <div class="prog-status" id="progStatus"></div>
+    <div class="prog-actions" id="progActions" style="display:none">
+      <button class="btn btn-blue" onclick="buildCards()">✅ Create Cards & Fill Details</button>
+      <button class="btn btn-ghost btn-sm" onclick="rescan()">🔄 Re-Scan</button>
+    </div>
+  </div>
+
+  <!-- EXCEL PREVIEW -->
+  <div class="excel-wrap" id="excelDiv">
+    <div class="excel-head">
+      <h3>📊 Excel Preview — Auto Updated</h3>
+      <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇ Download Excel</button>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Party Name</th><th>Owner Name</th><th>Designation</th>
+          <th>Mobile</th><th>Alt No.</th><th>Email</th><th>Website</th>
+          <th>Address</th><th>City</th><th>State</th><th>Pincode</th>
+        </tr></thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CARDS -->
+  <div id="cardsSection" style="display:none">
+    <div class="cards-header">
+      <h2>Visiting Cards</h2>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <span class="badge" id="cardBadge">0 cards</span>
+        <button class="btn btn-blue btn-sm" onclick="document.getElementById('fileIn').click()">+ Add More</button>
+      </div>
+    </div>
+    <div id="cardList"></div>
+  </div>
+
+  <div class="empty-state on" id="emptyMsg">
+    <div class="icon">🪪</div>
+    <p>No cards yet — upload images above.</p>
+  </div>
+
+</div>
+<div class="toast" id="toastEl"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+var imgs = [];       // all uploaded raw images
+var groups = [];     // matched groups: {front, back(optional), info}
+var cards = [];      // final card objects with details
+var imgIdCtr = 0, cardIdCtr = 0;
+var scanTimer = null;
+
+// ─────────────────────────────────────────────
+// API
+// ─────────────────────────────────────────────
+function getKey(){ return document.getElementById('apiKey').value.trim(); }
+
+function getProvider(){ return (document.getElementById('apiProvider')||{}).value || 'anthropic'; }
+
+async function callAPI(messages, maxTokens){
+  var key = getKey();
+  if(!key){ toast('Enter your API Key (top right) and click Save','err'); throw new Error('no key'); }
+  var provider = getProvider();
+
+  if(provider === 'gemini'){
+    var parts = [];
+    messages.forEach(function(msg){
+      if(Array.isArray(msg.content)){
+        msg.content.forEach(function(block){
+          if(block.type === 'text') parts.push({text: block.text});
+          else if(block.type === 'image') parts.push({inlineData:{mimeType: block.source.media_type, data: block.source.data}});
+        });
+      } else {
+        parts.push({text: String(msg.content)});
+      }
+    });
+    var payload = {
+      contents:[{role:'user', parts:parts}],
+      generationConfig:{maxOutputTokens: maxTokens||800}
+    };
+    var directUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+encodeURIComponent(key);
+    // Try direct fetch first (works when served over http/https)
+    // If that fails due to CORS (file:// origin), fall back to a public CORS proxy
+    async function tryFetch(url, body){
+      var r = await fetch(url, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      var d = await r.json();
+      if(d.error) throw new Error(d.error.message || JSON.stringify(d.error));
+      var cand = (d.candidates||[])[0];
+      if(!cand) throw new Error('Empty response from Gemini (status '+r.status+')');
+      return (cand.content.parts||[]).map(function(p){return p.text||'';}).join('');
+    }
+    try {
+      return await tryFetch(directUrl, payload);
+    } catch(e1) {
+      // If CORS/network error, route through corsproxy.io
+      if(e1.message && e1.message.match(/fetch|network|CORS/i)){
+        try {
+          var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(directUrl);
+          return await tryFetch(proxyUrl, payload);
+        } catch(e2) {
+          throw new Error('Both direct and proxy failed. Direct: '+e1.message+' | Proxy: '+e2.message);
+        }
+      }
+      throw e1;
+    }
+  } else {
+    // Anthropic — try direct, then CORS proxy fallback for file:// origins
+    var aHeaders = {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    };
+    var aBody = { model: 'claude-sonnet-4-20250514', max_tokens: maxTokens||500, messages: messages };
+    async function tryAnthropic(url, extraHeaders){
+      var h = Object.assign({}, aHeaders, extraHeaders||{});
+      var r = await fetch(url, {method:'POST', headers:h, body:JSON.stringify(aBody)});
+      var d = await r.json();
+      if(d.error) throw new Error(d.error.message);
+      return d.content.map(function(b){ return b.text||''; }).join('');
+    }
+    try {
+      return await tryAnthropic('https://api.anthropic.com/v1/messages');
+    } catch(e1) {
+      if(e1.message && e1.message.match(/fetch|network|CORS/i)){
+        try {
+          var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.anthropic.com/v1/messages');
+          return await tryAnthropic(proxyUrl);
+        } catch(e2) {
+          throw new Error('Both direct and proxy failed. Direct: '+e1.message+' | Proxy: '+e2.message);
+        }
+      }
+      throw e1;
+    }
+  }
+}
+
+function extractJSON(raw){
+  raw = (raw||'').replace(/```json|```/g,'').trim();
+  var s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+  if(s>=0 && e>s) return JSON.parse(raw.slice(s,e+1));
+  throw new Error('no JSON');
+}
+
+// ─────────────────────────────────────────────
+// UPLOAD & FILE READING
+// ─────────────────────────────────────────────
+function processFiles(files){
+  var arr = Array.from(files).filter(function(f){ return f.type.startsWith('image/'); });
+  if(!arr.length){ toast('No image files found','err'); return; }
+  var loaded = 0;
+  document.getElementById('progPanel').classList.add('on');
+  arr.forEach(function(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      imgs.push({ id: imgIdCtr++, url: e.target.result, mt: file.type||'image/jpeg',
+        fname: file.name, name:'', nameHindi:'', phone:'', company:'', companyHindi:'', email:'', side:'',
+        status:'pending'
+      });
+      loaded++;
+      renderThumbs();
+      if(loaded === arr.length){
+        clearTimeout(scanTimer);
+        scanTimer = setTimeout(scanAllImages, 500);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ─────────────────────────────────────────────
+// THUMBS
+// ─────────────────────────────────────────────
+function renderThumbs(){
+  var row = document.getElementById('thumbRow');
+  row.innerHTML = '';
+  imgs.forEach(function(img){
+    var cls = 'th ' + (img.status==='scanning'?'scanning':img.status==='done'?'matched':img.status==='fail'?'failed':'');
+    var icon = img.status==='scanning'?'⏳':img.status==='done'?'✅':img.status==='fail'?'❌':'🕐';
+    var label = img.name || img.fname.slice(0,14);
+    var d = document.createElement('div');
+    d.className = cls; d.id = 'th-'+img.id;
+    d.innerHTML = '<img src="'+img.url+'"><div class="th-overlay">'+icon+'</div><div class="th-label">'+label+'</div>';
+    row.appendChild(d);
+  });
+}
+
+function refreshThumb(img){
+  var d = document.getElementById('th-'+img.id);
+  if(!d) return;
+  d.className = 'th '+(img.status==='scanning'?'scanning':img.status==='done'?'matched':img.status==='fail'?'failed':'');
+  d.querySelector('.th-overlay').textContent = img.status==='scanning'?'⏳':img.status==='done'?'✅':img.status==='fail'?'❌':'🕐';
+  d.querySelector('.th-label').textContent = img.name||img.fname.slice(0,14);
+}
+
+function setProgress(done, total, label){
+  var pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('progFill').style.width = pct+'%';
+  document.getElementById('progNum').textContent = done+' / '+total;
+  document.getElementById('progLbl').textContent = label||'';
+}
+
+// ─────────────────────────────────────────────
+// STEP 1: SCAN ALL IMAGES — read name+phone from each card
+// ─────────────────────────────────────────────
+async function scanAllImages(){
+  // Check key before starting
+  if(!getKey()){ toast('Please paste your API key and click Save first!','err'); return; }
+
+  var toScan = imgs.filter(function(i){ return i.status==='pending'; });
+  var total = imgs.length;
+  var done = imgs.filter(function(i){ return i.status==='done'||i.status==='fail'; }).length;
+  document.getElementById('progTitle').textContent = '🔍 Reading Each Card...';
+  document.getElementById('progActions').style.display = 'none';
+  setProgress(done, total, 'Reading card text...');
+
+  for(var i=0; i<toScan.length; i++){
+    var img = toScan[i];
+    img.status = 'scanning'; refreshThumb(img);
+    try{
+      var b64 = img.url.split(',')[1] || img.url;
+      var raw = await callAPI([{
+        role:'user',
+        content:[
+          {type:'image', source:{type:'base64', media_type:img.mt, data:b64}},
+          {type:'text', text:'Look at this image. Find the visiting/business card in it (ignore hands, table, background). Read the text ON the card only.\n\nIMPORTANT: The card may have text in Hindi (Devanagari script) AND/OR English. Read both.\n\nReturn ONLY this JSON:\n{"name":"person full name in English (if Hindi name on card, transliterate it to English letters)","nameHindi":"person name in Hindi/Devanagari if present, else empty","company":"company name in English (transliterate if Hindi)","companyHindi":"company name in Hindi if present, else empty","phone":"phone number on card","email":"email address on card","side":"front or back"}'}
+        ]
+      }], 300);
+      var info = extractJSON(raw);
+      img.name        = (info.name||'').trim();
+      img.nameHindi   = (info.nameHindi||'').trim();
+      img.phone       = (info.phone||'').replace(/\D/g,'');
+      img.company     = (info.company||'').trim();
+      img.companyHindi= (info.companyHindi||'').trim();
+      img.email       = (info.email||'').trim().toLowerCase();
+      img.side        = (info.side||'').trim();
+      img.status  = 'done';
+    } catch(ex){
+      console.error('Scan error:', ex);
+      img.status = 'fail';
+      img.errorMsg = ex.message || 'Unknown error';
+      // If first image fails with auth error, stop all
+      if(i === 0 && (ex.message||'').match(/key|auth|401|403|invalid/i)){
+        toast('API Error: ' + (ex.message||'Check your key'), 'err');
+        document.getElementById('progTitle').textContent = '❌ API Error — Check Key';
+        document.getElementById('progStatus').textContent = ex.message || 'Authentication failed';
+        imgs.forEach(function(im){ if(im.status==='pending') im.status='fail'; im.errorMsg=ex.message; });
+        renderThumbs();
+        setProgress(total, total, 'Failed');
+        return;
+      }
+    }
+    done++;
+    refreshThumb(img);
+    setProgress(done, total, done < total ? 'Reading card '+(i+2)+' of '+total+'...' : 'Done! Matching pairs...');
+  }
+
+  matchAndShowResult();
+}
+
+// ─────────────────────────────────────────────
+// STEP 2: MATCH — same name+phone = same card
+// ─────────────────────────────────────────────
+function normName(s){
+  return (s||'').toLowerCase().replace(/[^a-z0-9]/g,'').trim();
+}
+function normPhone(s){
+  return (s||'').replace(/\D/g,'').slice(-8); // last 8 digits
+}
+function similarity(a, b){
+  a = normName(a); b = normName(b);
+  if(!a||!b) return 0;
+  if(a===b) return 1;
+  var longer = a.length>b.length?a:b, shorter = a.length>b.length?b:a;
+  var matches = 0;
+  for(var i=0;i<shorter.length;i++){
+    if(longer.indexOf(shorter[i])>=0) matches++;
+  }
+  return matches/longer.length;
+}
+
+function matchAndShowResult(){
+  groups = [];
+  var used = new Set();
+  var done = imgs.filter(function(i){ return i.status==='done'; });
+
+  done.forEach(function(img){
+    if(used.has(img.id)) return;
+    // Find best matching partner
+    var best = null, bestScore = 0;
+    done.forEach(function(other){
+      if(other.id === img.id || used.has(other.id)) return;
+      var sc = 0;
+
+      // Phone match — strongest signal (same card = same phone)
+      var ph1 = normPhone(img.phone), ph2 = normPhone(other.phone);
+      if(ph1 && ph2 && ph1.length>=6 && ph1===ph2) sc += 70;
+      else if(ph1 && ph2 && ph1.length>=4 && ph1===ph2) sc += 40;
+
+      // Email — full match or domain match
+      var em1 = (img.email||'').toLowerCase();
+      var em2 = (other.email||'').toLowerCase();
+      var dom1 = em1.split('@')[1]||'';
+      var dom2 = em2.split('@')[1]||'';
+      if(em1 && em2 && em1===em2) sc += 70;           // exact email match
+      else if(dom1 && dom2 && dom1===dom2) sc += 50;  // same domain e.g. @studiokalpavas.com
+
+      // Company name — check English + Hindi both
+      var cs = Math.max(
+        similarity(img.company,      other.company),
+        similarity(img.companyHindi, other.companyHindi),
+        similarity(img.company,      other.companyHindi),
+        similarity(img.companyHindi, other.company)
+      );
+      if(cs > 0.75) sc += 55;
+      else if(cs > 0.55) sc += 35;
+      else if(cs > 0.35) sc += 15;
+      if(img.company && other.company && cs < 0.15) sc -= 40;
+
+      // Person name — check English + Hindi both
+      var ns = Math.max(
+        similarity(img.name,      other.name),
+        similarity(img.nameHindi, other.nameHindi),
+        similarity(img.name,      other.nameHindi),
+        similarity(img.nameHindi, other.name)
+      );
+      if(ns > 0.75) sc += 40;
+      else if(ns > 0.55) sc += 22;
+      else if(ns > 0.35) sc += 10;
+      if(img.name && other.name && ns < 0.15) sc -= 40;
+
+      // Front + back bonus
+      if((img.side==='front'&&other.side==='back')||(img.side==='back'&&other.side==='front')) sc += 20;
+
+      if(sc > bestScore){ bestScore = sc; best = other; }
+    });
+
+    if(best && bestScore >= 35){
+      // Confident pair found
+      var front = (img.side==='back') ? best : img;
+      var back  = (img.side==='back') ? img  : best;
+      groups.push({ front:front, back:back, paired:true });
+      used.add(img.id); used.add(best.id);
+    } else {
+      // No confident match — single image card
+      groups.push({ front:img, back:null, paired:false });
+      used.add(img.id);
+    }
+  });
+
+  // Failed scans — add as single
+  imgs.filter(function(i){ return i.status==='fail' && !used.has(i.id); }).forEach(function(img){
+    groups.push({ front:img, back:null, paired:false });
+    used.add(img.id);
+  });
+
+  var paired = groups.filter(function(g){ return g.paired; }).length;
+  var single = groups.filter(function(g){ return !g.paired; }).length;
+
+  document.getElementById('progTitle').textContent = '✅ Matching Complete';
+  document.getElementById('progStatus').textContent =
+    paired+' pairs matched  |  '+single+' single-side cards  |  Click below to create cards & fill details';
+  document.getElementById('progActions').style.display = 'flex';
+  setProgress(imgs.length, imgs.length, 'All images read!');
+}
+
+// ─────────────────────────────────────────────
+// STEP 3: BUILD CARDS + AUTO FILL DETAILS
+// ─────────────────────────────────────────────
+function buildCards(){
+  document.getElementById('progPanel').classList.remove('on');
+  groups.forEach(function(g){
+    createCard(g.front, g.back);
+  });
+  groups = []; imgs = [];
+  toast('Cards created! AI is filling details...','ok');
+}
+
+function createCard(front, back){
+  var id = cardIdCtr++;
+  var card = {
+    id:id, front:front, back:back,
+    partyName:'', ownerName:'', designation:'',
+    phone:'', altPhone:'', email:'', website:'',
+    address:'', city:'', state:'', pincode:''
+  };
+  cards.push(card);
+  updateView();
+  renderCard(card);
+  fillDetails(card);
+}
+
+// ─────────────────────────────────────────────
+// RENDER CARD
+// ─────────────────────────────────────────────
+function renderCard(card){
+  var num = cards.findIndex(function(c){ return c.id===card.id; })+1;
+  var div = document.createElement('div');
+  div.className = 'card'; div.id = 'card-'+card.id;
+
+  var imgHTML = card.back
+    ? '<div class="img-box"><span class="img-box-label">FRONT</span><img src="'+card.front.url+'"></div>'
+      +'<div class="img-box"><span class="img-box-label">BACK</span><img src="'+card.back.url+'"></div>'
+    : '<div class="img-box-single"><span class="img-box-label" style="color:var(--gold)">SINGLE</span><img src="'+card.front.url+'"></div>';
+
+  div.innerHTML =
+    '<div class="card-head">'
+      +'<div class="card-head-left">'
+        +'<div class="card-num">'+num+'</div>'
+        +'<div><div class="card-title" id="ct-'+card.id+'">Card #'+num+'</div>'
+        +'<div class="card-sub" id="cs-'+card.id+'"></div></div>'
+      +'</div>'
+      +'<button class="btn btn-del" onclick="deleteCard('+card.id+')">🗑 Delete</button>'
+    +'</div>'
+    +'<div class="card-body">'
+      +'<div class="card-imgs">'+imgHTML+'</div>'
+      +'<div class="card-fields">'
+        +'<div class="field-status loading" id="fs-'+card.id+'"><div class="spin"></div> Reading card details...</div>'
+        +'<div class="fields" id="ff-'+card.id+'">'+fieldsHTML(card)+'</div>'
+      +'</div>'
+    +'</div>';
+  document.getElementById('cardList').appendChild(div);
+}
+
+function fieldsHTML(c){
+  function v(x){ return (x||'').replace(/"/g,'&quot;'); }
+  return ''
+    +'<div class="field"><label>🏢 Party Name</label><input value="'+v(c.partyName)+'" placeholder="Company / Firm" oninput="setField('+c.id+',\'partyName\',this.value)"></div>'
+    +'<div class="field"><label>👤 Owner Name</label><input value="'+v(c.ownerName)+'" placeholder="Person Name" oninput="setField('+c.id+',\'ownerName\',this.value)"></div>'
+    +'<div class="field"><label>💼 Designation</label><input value="'+v(c.designation)+'" placeholder="Job Title" oninput="setField('+c.id+',\'designation\',this.value)"></div>'
+    +'<div class="field"><label>📞 Mobile</label><input value="'+v(c.phone)+'" placeholder="Primary Number" oninput="setField('+c.id+',\'phone\',this.value)"></div>'
+    +'<div class="field"><label>📞 Alt Number</label><input value="'+v(c.altPhone)+'" placeholder="Second Number" oninput="setField('+c.id+',\'altPhone\',this.value)"></div>'
+    +'<div class="field"><label>📧 Email</label><input value="'+v(c.email)+'" placeholder="Email Address" oninput="setField('+c.id+',\'email\',this.value)"></div>'
+    +'<div class="field"><label>🌐 Website</label><input value="'+v(c.website)+'" placeholder="Website" oninput="setField('+c.id+',\'website\',this.value)"></div>'
+    +'<div class="field wide"><label>📍 Address</label><input value="'+v(c.address)+'" placeholder="Full Address" oninput="setField('+c.id+',\'address\',this.value)"></div>'
+    +'<div class="field"><label>🏙 City</label><input value="'+v(c.city)+'" placeholder="City" oninput="setField('+c.id+',\'city\',this.value)"></div>'
+    +'<div class="field"><label>🗺 State</label><input value="'+v(c.state)+'" placeholder="State" oninput="setField('+c.id+',\'state\',this.value)"></div>'
+    +'<div class="field"><label>📮 Pincode</label><input value="'+v(c.pincode)+'" placeholder="Pincode" oninput="setField('+c.id+',\'pincode\',this.value)"></div>';
+}
+
+function setField(id, field, val){
+  var c = cards.find(function(x){ return x.id===id; });
+  if(!c) return;
+  c[field] = val;
+  if(field==='ownerName'||field==='partyName'){
+    var t = document.getElementById('ct-'+id);
+    var s = document.getElementById('cs-'+id);
+    if(t) t.textContent = c.ownerName || c.partyName || 'Card #'+(cards.findIndex(function(x){return x.id===id;})+1);
+    if(s) s.textContent = c.partyName||'';
+  }
+  refreshTable();
+}
+
+// ─────────────────────────────────────────────
+// STEP 4: AI AUTO-FILL DETAILS
+// ─────────────────────────────────────────────
+async function fillDetails(card){
+  var st = document.getElementById('fs-'+card.id);
+  try{
+    var content = [];
+    // Add front image
+    var fb = card.front.url.split(',')[1]||card.front.url;
+    content.push({type:'image', source:{type:'base64', media_type:card.front.mt||'image/jpeg', data:fb}});
+    // Add back image if available
+    if(card.back){
+      var bb = card.back.url.split(',')[1]||card.back.url;
+      content.push({type:'image', source:{type:'base64', media_type:card.back.mt||'image/jpeg', data:bb}});
+    }
+    content.push({type:'text', text:'These are images of a visiting card. Read ALL text printed on the card — ignore hands, background, angle, shadows.\n\nExtract every contact detail. Return ONLY this JSON:\n{"partyName":"company or firm name","ownerName":"person full name (no titles like Dr/Mr/Mrs/Sh)","designation":"job title","phone":"primary phone number","altPhone":"second phone number if any","email":"email address","website":"website url","address":"complete street address","city":"city name","state":"state name","pincode":"pin code"}'});
+
+    var raw = await callAPI([{role:'user', content:content}], 800);
+    var p = extractJSON(raw);
+
+    card.partyName   = p.partyName   || '';
+    card.ownerName   = p.ownerName   || '';
+    card.designation = p.designation || '';
+    card.phone       = p.phone       || '';
+    card.altPhone    = p.altPhone    || '';
+    card.email       = p.email       || '';
+    card.website     = p.website     || '';
+    card.address     = p.address     || '';
+    card.city        = p.city        || '';
+    card.state       = p.state       || '';
+    card.pincode     = p.pincode     || '';
+
+    // Update fields in DOM
+    var ff = document.getElementById('ff-'+card.id);
+    if(ff) ff.innerHTML = fieldsHTML(card);
+    var t = document.getElementById('ct-'+card.id);
+    var s = document.getElementById('cs-'+card.id);
+    if(t) t.textContent = card.ownerName || card.partyName || 'Card #'+(cards.findIndex(function(x){return x.id===card.id;})+1);
+    if(s) s.textContent = card.partyName || '';
+    if(st){ st.className='field-status done'; st.innerHTML='✅ Details filled!'; }
+    setTimeout(function(){ if(st) st.style.display='none'; }, 2500);
+    refreshTable();
+  } catch(ex){
+    console.error('fillDetails error:', ex);
+    var errMsg = ex.message || 'Unknown error';
+    if(st){ st.className='field-status fail'; st.innerHTML='⚠️ Could not read: ' + errMsg; }
+    toast('Fill error: ' + errMsg, 'err');
+    refreshTable();
+  }
+}
+
+// ─────────────────────────────────────────────
+// EXCEL TABLE + EXPORT
+// ─────────────────────────────────────────────
+function refreshTable(){
+  var tb = document.getElementById('tblBody');
+  if(!tb) return;
+  tb.innerHTML = '';
+  cards.forEach(function(c, i){
+    var tr = document.createElement('tr');
+    [i+1, c.partyName, c.ownerName, c.designation,
+     c.phone, c.altPhone, c.email, c.website,
+     c.address, c.city, c.state, c.pincode
+    ].forEach(function(val){
+      var td = document.createElement('td');
+      td.textContent = val||''; td.title = val||'';
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  var ew = document.getElementById('excelDiv');
+  ew.classList.toggle('on', cards.length>0);
+}
+
+function exportExcel(){
+  if(!cards.length){ toast('No cards to export','err'); return; }
+  var hdr = ['Sr No','Party Name','Owner Name','Designation','Mobile','Alt Number','Email','Website','Address','City','State','Pincode'];
+  var rows = [hdr];
+  cards.forEach(function(c,i){
+    rows.push([i+1, c.partyName, c.ownerName, c.designation,
+      c.phone, c.altPhone, c.email, c.website,
+      c.address, c.city, c.state, c.pincode]);
+  });
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [5,26,22,20,15,15,26,22,38,14,14,10].map(function(w){ return {wch:w}; });
+  XLSX.utils.book_append_sheet(wb, ws, 'Visiting Cards');
+  XLSX.writeFile(wb, 'visiting_cards_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Excel downloaded! ('+cards.length+' cards)','ok');
+}
+
+// ─────────────────────────────────────────────
+// MISC
+// ─────────────────────────────────────────────
+function deleteCard(id){
+  cards = cards.filter(function(c){ return c.id!==id; });
+  var el = document.getElementById('card-'+id);
+  if(el){ el.style.opacity='0'; el.style.transform='scale(.97)'; el.style.transition='all .18s'; setTimeout(function(){el.remove();},200); }
+  updateView(); refreshTable();
+}
+
+function clearAll(){
+  if(!confirm('Clear everything?')) return;
+  cards=[]; imgs=[]; groups=[];
+  document.getElementById('cardList').innerHTML='';
+  document.getElementById('progPanel').classList.remove('on');
+  document.getElementById('excelDiv').classList.remove('on');
+  updateView();
+  toast('All cleared','ok');
+}
+
+function rescan(){
+  imgs.forEach(function(i){ i.status='pending'; i.name=''; i.phone=''; i.company=''; i.side=''; });
+  renderThumbs();
+  document.getElementById('progActions').style.display='none';
+  scanAllImages();
+}
+
+function updateView(){
+  var has = cards.length>0;
+  document.getElementById('cardsSection').style.display = has?'block':'none';
+  document.getElementById('emptyMsg').classList.toggle('on',!has);
+  document.getElementById('xlBtn').style.display = has?'flex':'none';
+  document.getElementById('clrBtn').style.display = has?'flex':'none';
+  var b = document.getElementById('cardBadge');
+  if(b) b.textContent = cards.length+' card'+(cards.length!==1?'s':'');
+}
+
+function toast(msg, type){
+  var t = document.getElementById('toastEl');
+  t.textContent = msg;
+  t.className = 'toast show'+(type==='ok'?' ok':type==='err'?' err':'');
+  clearTimeout(t._t);
+  t._t = setTimeout(function(){ t.classList.remove('show'); }, 3500);
+}
+
+// ─────────────────────────────────────────────
+// API KEY MANAGEMENT
+// ─────────────────────────────────────────────
+async function testKey(){
+  var k = document.getElementById('apiKey').value.trim();
+  if(!k){ toast('Paste your API key first','err'); return; }
+  var provider = getProvider();
+  toast('Testing key...', '');
+  try{
+    var testMsg = [{role:'user', content:[{type:'text', text:'Reply with just the word: OK'}]}];
+    var result = await callAPI(testMsg, 50);
+    if(result){ toast('✅ Key works! (' + provider + ')', 'ok'); }
+    else { toast('⚠️ Got empty response', 'err'); }
+  } catch(ex){
+    toast('❌ Key failed: ' + (ex.message||'unknown error'), 'err');
+  }
+}
+
+function saveKey(){
+  var k = document.getElementById('apiKey').value.trim();
+  if(!k){ toast('Please paste your API key first','err'); return; }
+
+  try{ localStorage.setItem('vc_k', k); }catch(e){}
+  var badge = document.getElementById('keySavedBadge');
+  var wrap = document.getElementById('keyWrap');
+  badge.classList.add('on');
+  wrap.classList.add('saved');
+  toast('API key saved! ✅','ok');
+  setTimeout(function(){ badge.classList.remove('on'); wrap.classList.remove('saved'); }, 3000);
+}
+
+function toggleKeyVisibility(){
+  var inp = document.getElementById('apiKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// Init
+updateView();
+try{
+  var k = localStorage.getItem('vc_k');
+  var p = localStorage.getItem('vc_p');
+  if(k){
+    document.getElementById('apiKey').value = k;
+    var badge = document.getElementById('keySavedBadge');
+    badge.classList.add('on');
+    setTimeout(function(){ badge.classList.remove('on'); }, 2000);
+  }
+  if(p){ document.getElementById('apiProvider').value = p; }
+}catch(e){}
+</script>
+</body>
+</html>
