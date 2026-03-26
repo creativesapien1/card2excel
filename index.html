@@ -3,862 +3,1059 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Visiting Card Organizer</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script type="importmap">
-{"imports": {"@google/generative-ai": "https://esm.run/@google/generative-ai"}}
-</script>
+<title>CardScan Pro — AI Business Card Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#07090d;--s1:#0f1318;--s2:#161c24;--s3:#1c2530;
-  --b1:#1e2a38;--b2:#263548;
-  --blue:#3b9eff;--teal:#00d4aa;--gold:#f5a623;
-  --green:#2ecc71;--red:#e74c3c;--purple:#8b5cf6;
-  --text:#dde6f0;--dim:#6b8399;--dim2:#9ab0c4;
-}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* HEADER */
-.hdr{padding:1rem 1.5rem;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;background:var(--s1)}
-.brand{display:flex;align-items:center;gap:.6rem}
-.brand-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
-.brand h1{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--blue)}
-.brand p{font-size:.65rem;color:var(--dim2);margin-top:1px}
-.hdr-right{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
-.key-wrap{display:flex;align-items:center;gap:.35rem;background:var(--s2);border:1px solid var(--b2);border-radius:7px;padding:.3rem .7rem;transition:border-color .2s}
-.key-wrap:focus-within{border-color:var(--blue)}
-.key-wrap.saved{border-color:var(--green)}
-.key-wrap span{font-size:.65rem;color:var(--dim2);white-space:nowrap}
-.key-wrap input{background:none;border:none;outline:none;color:var(--text);font-size:.73rem;width:180px;font-family:'DM Sans',sans-serif}
-.key-toggle{background:none;border:none;cursor:pointer;color:var(--dim2);font-size:.75rem;padding:0 .15rem;line-height:1;transition:color .15s}
-.key-toggle:hover{color:var(--text)}
-.key-save{background:var(--blue);border:none;cursor:pointer;color:#fff;font-size:.65rem;font-family:'DM Sans',sans-serif;font-weight:600;border-radius:4px;padding:.2rem .5rem;white-space:nowrap;transition:background .15s}
-.key-save:hover{background:#5bb3ff}
-.key-saved-badge{font-size:.62rem;color:var(--green);white-space:nowrap;display:none}
-.key-saved-badge.on{display:inline}
-.provider-sel{background:var(--s3);border:1px solid var(--b2);color:var(--dim2);font-size:.65rem;font-family:'DM Sans',sans-serif;border-radius:4px;padding:.2rem .4rem;cursor:pointer;outline:none}
-.provider-sel:focus{border-color:var(--blue)}
+  :root {
+    --bg0: #07070f;
+    --bg1: #09091a;
+    --bg2: #0c0c18;
+    --bg3: #111120;
+    --border: #1a1a2e;
+    --border2: #2a2a3a;
+    --text1: #e8e8f8;
+    --text2: #a0a0c0;
+    --text3: #666688;
+    --accent: #8888ff;
+    --accent2: #44ddcc;
+    --green: #44cc44;
+    --red: #ee4444;
+    --amber: #ffaa44;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
 
-/* BUTTONS */
-.btn{border:none;cursor:pointer;border-radius:7px;font-family:'DM Sans',sans-serif;font-weight:500;font-size:.82rem;transition:all .18s;display:inline-flex;align-items:center;gap:.35rem;padding:.48rem .95rem;white-space:nowrap}
-.btn-blue{background:linear-gradient(135deg,var(--blue),#5bb3ff);color:#fff}
-.btn-blue:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(59,158,255,.3)}
-.btn-green{background:linear-gradient(135deg,#1a9e52,var(--green));color:#fff}
-.btn-green:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(46,204,113,.3)}
-.btn-ghost{background:var(--s2);border:1px solid var(--b2);color:var(--text)}
-.btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
-.btn-del{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.25);color:var(--red);padding:.32rem .7rem;font-size:.74rem}
-.btn-sm{padding:.3rem .65rem!important;font-size:.72rem!important}
+  html { scroll-behavior: smooth; }
 
-/* MAIN */
-.main{max-width:1280px;margin:0 auto;padding:1.5rem}
+  body {
+    background: var(--bg0);
+    font-family: var(--sans);
+    color: var(--text1);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
 
-/* UPLOAD */
-.drop{border:2px dashed var(--b2);border-radius:12px;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:all .25s;background:var(--s1);margin-bottom:1.25rem}
-.drop:hover,.drop.over{border-color:var(--blue);background:var(--s2);box-shadow:0 0 0 1px rgba(59,158,255,.12)}
-.drop input{display:none}
-.drop-icon{font-size:2rem;margin-bottom:.4rem}
-.drop h2{font-size:1rem;font-weight:600;margin-bottom:.2rem}
-.drop p{font-size:.78rem;color:var(--dim2)}
-.drop-hint{margin-top:.6rem;display:inline-flex;align-items:center;gap:.3rem;background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.2);color:var(--blue);border-radius:100px;padding:.25rem .75rem;font-size:.68rem}
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; background: var(--bg1); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
-/* PROGRESS PANEL */
-.prog-panel{background:var(--s1);border:1px solid var(--b1);border-radius:12px;padding:1.1rem;margin-bottom:1.25rem;display:none}
-.prog-panel.on{display:block}
-.prog-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem}
-.prog-top h3{font-size:.88rem;font-weight:600;color:var(--blue)}
-.prog-bar-wrap{margin-bottom:.75rem}
-.prog-lbl{display:flex;justify-content:space-between;font-size:.7rem;color:var(--dim2);margin-bottom:.28rem}
-.prog-bar{height:5px;background:var(--b1);border-radius:100px;overflow:hidden}
-.prog-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:100px;transition:width .35s;width:0}
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+    height: 58px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
+    backdrop-filter: blur(12px);
+  }
 
-/* IMAGE THUMBS */
-.thumb-row{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem}
-.th{position:relative;width:88px;border-radius:6px;overflow:hidden;border:2px solid var(--b1);flex-shrink:0}
-.th img{width:100%;height:56px;object-fit:cover;display:block}
-.th-overlay{position:absolute;inset:0;background:rgba(7,9,13,.5);display:flex;align-items:center;justify-content:center;font-size:.9rem}
-.th-label{position:absolute;bottom:0;left:0;right:0;background:rgba(7,9,13,.88);color:var(--dim2);font-size:.52rem;padding:2px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.th.scanning{border-color:var(--gold)}
-.th.matched{border-color:var(--green)}
-.th.alone{border-color:var(--dim)}
-.th.failed{border-color:var(--red)}
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { color: var(--accent); font-size: 22px; }
+  .logo-text {
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    letter-spacing: 2.5px; color: #c0c0ff; text-transform: uppercase;
+  }
+  .logo-badge {
+    font-family: var(--mono); font-size: 9px; color: #5555bb;
+    padding: 2px 7px; border: 1px solid #2a2a44; border-radius: 2px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
 
-.prog-status{font-size:.78rem;color:var(--dim2);margin-top:.5rem}
-.prog-actions{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
+  .header-actions { display: flex; gap: 8px; align-items: center; }
 
-/* CARDS */
-.cards-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem}
-.cards-header h2{font-family:'Playfair Display',serif;font-size:1.15rem}
-.badge{background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.2);color:var(--blue);border-radius:100px;padding:.15rem .6rem;font-size:.68rem}
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 5px; font-family: var(--sans); font-size: 12px;
+    font-weight: 500; cursor: pointer; transition: all .18s;
+    white-space: nowrap; letter-spacing: .3px; border: 1px solid;
+    padding: 7px 14px;
+  }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn-ghost { background: none; border-color: var(--border2); color: var(--text2); }
+  .btn-ghost:hover:not(:disabled) { background: var(--bg3); color: var(--text1); }
+  .btn-danger { background: none; border-color: #331a1a; color: #884444; }
+  .btn-danger:hover { background: #1a0a0a; border-color: #553333; }
+  .btn-export { background: var(--bg2); border-color: #2a5a2a; color: #44bb44; }
+  .btn-export:hover:not(:disabled) { background: #1a2a1a; }
+  .btn-settings { background: none; border-color: #2a2a44; color: var(--accent); }
+  .btn-settings:hover { background: #0f0f22; }
+  .btn-primary { background: #22224a; border-color: #4444aa; color: #aaaaff; }
+  .btn-primary:hover:not(:disabled) { background: #2a2a5a; }
+  .btn-sm { padding: 3px 9px; font-size: 10px; }
 
-.card{background:var(--s1);border:1px solid var(--b1);border-radius:11px;margin-bottom:.9rem;overflow:hidden;animation:fadeUp .3s ease}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.card:hover{border-color:var(--b2)}
-.card-head{display:flex;justify-content:space-between;align-items:center;padding:.65rem .9rem;background:var(--s2);border-bottom:1px solid var(--b1)}
-.card-head-left{display:flex;align-items:center;gap:.55rem}
-.card-num{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:#fff;flex-shrink:0}
-.card-title{font-weight:600;font-size:.84rem}
-.card-sub{font-size:.68rem;color:var(--dim2);margin-top:1px}
-.card-body{display:flex;gap:.9rem;padding:.9rem;flex-wrap:wrap}
+  /* ── MAIN ── */
+  main { max-width: 1120px; margin: 0 auto; padding: 30px 20px 60px; }
 
-/* IMAGES */
-.card-imgs{display:flex;flex-direction:column;gap:.45rem;flex-shrink:0}
-.img-box{width:170px;border-radius:8px;overflow:hidden;border:1px solid var(--b2);position:relative;background:var(--s3)}
-.img-box img{width:100%;display:block}
-.img-box-label{position:absolute;top:4px;left:4px;background:rgba(7,9,13,.82);color:var(--teal);font-size:.54rem;font-weight:700;letter-spacing:.07em;border-radius:3px;padding:2px 5px;text-transform:uppercase}
-.img-box-single{width:170px;border-radius:8px;overflow:hidden;border:1px solid var(--b2);position:relative;background:var(--s3)}
-.img-box-single img{width:100%;display:block}
+  /* ── API SETTINGS PANEL ── */
+  .api-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 22px;
+    overflow: hidden;
+    display: none;
+  }
+  .api-panel.open { display: block; }
 
-/* FIELDS */
-.card-fields{flex:1;min-width:220px}
-.field-status{display:flex;align-items:center;gap:.4rem;font-size:.68rem;margin-bottom:.4rem;color:var(--dim2)}
-.field-status.loading{color:var(--gold)}
-.field-status.done{color:var(--green)}
-.field-status.fail{color:var(--red)}
-.spin{width:11px;height:11px;border:2px solid rgba(245,166,35,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
-@keyframes spin{to{transform:rotate(360deg)}}
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:.42rem}
-.field{display:flex;flex-direction:column;gap:.15rem}
-.field.wide{grid-column:1/-1}
-.field label{font-size:.58rem;color:var(--dim);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
-.field input{background:var(--s3);border:1px solid var(--b2);color:var(--text);border-radius:6px;padding:.36rem .6rem;font-family:'DM Sans',sans-serif;font-size:.76rem;width:100%;transition:border-color .18s}
-.field input:focus{outline:none;border-color:var(--blue)}
-.field input::placeholder{color:var(--dim);opacity:.5}
+  .api-panel-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .api-panel-title { font-family: var(--mono); font-size: 12px; letter-spacing: 1.5px; color: var(--accent); text-transform: uppercase; }
 
-/* EXCEL TABLE */
-.excel-wrap{background:var(--s1);border:1px solid var(--b1);border-radius:11px;margin-bottom:1.25rem;overflow:hidden;display:none}
-.excel-wrap.on{display:block}
-.excel-head{display:flex;justify-content:space-between;align-items:center;padding:.65rem 1rem;background:var(--s2);border-bottom:1px solid var(--b1);flex-wrap:wrap;gap:.4rem}
-.excel-head h3{font-size:.82rem;font-weight:600;color:var(--green)}
-.tbl-scroll{overflow-x:auto;max-height:260px;overflow-y:auto}
-table{width:100%;border-collapse:collapse;font-size:.7rem}
-thead th{background:#0a1e30;color:var(--teal);padding:.42rem .6rem;text-align:left;white-space:nowrap;border-bottom:1px solid var(--b2);font-size:.63rem;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;z-index:1}
-tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
-tbody tr:hover{background:rgba(59,158,255,.04)}
-tbody td{padding:.38rem .6rem;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--b1)}
-tbody td:first-child{color:var(--dim2);font-size:.65rem}
+  .api-tabs { display: flex; gap: 2px; padding: 16px 22px 0; }
+  .api-tab {
+    padding: 8px 16px; border-radius: 6px 6px 0 0; font-size: 13px;
+    font-weight: 500; cursor: pointer; transition: all .15s; border: 1px solid transparent;
+    border-bottom: none; color: var(--text3); background: none;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .api-tab.active {
+    background: var(--bg3); border-color: var(--border2);
+    color: var(--text1);
+  }
+  .api-tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border2); }
+  .api-tab.active .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
 
-/* TOAST */
-.toast{position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;background:var(--s3);border:1px solid var(--b2);border-radius:9px;padding:.65rem .9rem;font-size:.78rem;box-shadow:0 6px 24px rgba(0,0,0,.5);transform:translateY(12px);opacity:0;transition:all .28s;pointer-events:none;max-width:280px}
-.toast.show{transform:translateY(0);opacity:1}
-.toast.ok{border-color:rgba(46,204,113,.4)}
-.toast.err{border-color:rgba(231,76,60,.4)}
+  .api-tab-content { display: none; padding: 20px 22px 22px; }
+  .api-tab-content.active { display: block; }
 
-.empty-state{text-align:center;padding:3rem 1rem;color:var(--dim);display:none}
-.empty-state.on{display:block}
-.empty-state .icon{font-size:2rem;opacity:.25;margin-bottom:.6rem}
+  .api-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+  .form-group { margin-bottom: 14px; }
+  .form-group:last-child { margin-bottom: 0; }
+  .form-label {
+    display: block; font-size: 10px; font-family: var(--mono);
+    letter-spacing: 1px; color: var(--text3); text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .form-input {
+    width: 100%; background: var(--bg1); border: 1px solid var(--border2);
+    border-radius: 5px; padding: 9px 12px; color: var(--text1);
+    font-family: var(--mono); font-size: 12px; outline: none;
+    transition: border-color .15s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text3); }
 
-@media(max-width:560px){
-  .main{padding:.85rem}
-  .card-body{flex-direction:column}
-  .img-box,.img-box-single{width:100%}
-  .fields{grid-template-columns:1fr}
-}
+  .api-info {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #0d0d20; border: 1px solid #2a2a40; border-radius: 6px;
+    padding: 12px 14px; margin-top: 12px; font-size: 12px; color: var(--text3);
+  }
+  .api-info a { color: var(--accent); text-decoration: none; }
+  .api-info a:hover { text-decoration: underline; }
+
+  .free-badge {
+    font-size: 9px; font-family: var(--mono); padding: 1px 6px;
+    border-radius: 3px; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .free-badge.free { background: #1a3a1a; color: #44cc44; border: 1px solid #2a5a2a; }
+  .free-badge.limited { background: #2a2a1a; color: #ccaa44; border: 1px solid #4a4a2a; }
+
+  /* ── DROP ZONE ── */
+  .dropzone {
+    border: 2px dashed var(--border2); border-radius: 10px;
+    padding: 44px 20px; text-align: center; cursor: pointer;
+    transition: all .2s; user-select: none; position: relative;
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: #0d0d20; }
+  .dropzone-icon { margin-bottom: 12px; opacity: .7; }
+  .dropzone-title { font-size: 15px; color: var(--text2); margin-bottom: 6px; }
+  .dropzone-title span { color: var(--accent); text-decoration: underline; }
+  .dropzone-sub { font-size: 11px; color: var(--text3); font-family: var(--mono); letter-spacing: .5px; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: none; flex-wrap: wrap; gap: 20px; align-items: center;
+    margin: 18px 0 0; padding: 12px 20px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 7px;
+  }
+  .stat { display: flex; gap: 6px; align-items: baseline; }
+  .stat-val { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+  .scanning-label {
+    display: none; margin-left: auto; font-size: 11px; color: var(--green);
+    align-items: center; gap: 6px; font-family: var(--mono);
+  }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+
+  /* ── SEARCH/FILTER BAR ── */
+  .filter-bar {
+    display: none; gap: 10px; align-items: center; margin-top: 14px;
+  }
+  .filter-bar.visible { display: flex; }
+  .search-wrap { position: relative; flex: 1; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); }
+  .search-input {
+    width: 100%; background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 5px; padding: 8px 12px 8px 34px; color: var(--text1);
+    font-size: 13px; outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .filter-select {
+    background: var(--bg2); border: 1px solid var(--border2); border-radius: 5px;
+    padding: 8px 12px; color: var(--text1); font-size: 12px; outline: none;
+    font-family: var(--mono); cursor: pointer;
+  }
+
+  /* ── TABLE ── */
+  .table-wrap { margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; display: none; }
+  .table-head {
+    display: grid; grid-template-columns: 62px 1fr 1fr 150px 120px 96px;
+    gap: 10px; padding: 8px 18px;
+    background: #0a0a16; border-bottom: 1px solid var(--border);
+  }
+  .th { font-size: 9px; font-family: var(--mono); color: #444466; text-transform: uppercase; letter-spacing: 1px; }
+
+  .card-row { border-bottom: 1px solid #1e1e2e; animation: fadeIn .3s ease; }
+  .card-row:last-child { border-bottom: none; }
+  .card-summary {
+    display: grid; grid-template-columns: 62px 1fr 1fr 150px 120px 96px;
+    gap: 10px; align-items: center; padding: 11px 18px;
+    transition: background .12s; cursor: pointer;
+  }
+  .card-summary:hover { background: #0f0f1e; }
+  .card-thumb { width: 58px; height: 36px; object-fit: cover; border-radius: 3px; border: 1px solid var(--border2); }
+  .card-name { font-size: 13px; color: var(--text1); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-sub { font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-actions { display: flex; gap: 5px; }
+
+  .status-badge {
+    font-size: 9px; font-family: var(--mono); letter-spacing: 1px;
+    padding: 2px 8px; border-radius: 2px; text-transform: uppercase;
+    white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  .card-expand {
+    display: none; border-top: 1px solid #1e1e2e;
+    padding: 14px 18px 16px 88px;
+    background: #090914;
+  }
+  .card-expand.open { display: block; }
+  .expand-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 20px; }
+  .expand-field { padding: 4px 0; }
+  .expand-field-label { font-size: 9px; color: var(--text3); font-family: var(--mono); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+  .expand-field-val { font-size: 12px; color: #c8c8e0; word-break: break-all; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text3); display: none; }
+  .empty-state.visible { display: block; }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.9); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--bg2); border: 1px solid #2a2a4a; border-radius: 10px;
+    padding: 28px; width: 560px; max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 32px 100px rgba(0,0,0,.8);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .modal-title { font-family: var(--mono); font-size: 13px; color: var(--text1); font-weight: 700; letter-spacing: 1px; }
+  .modal-close { background: none; border: none; color: var(--text3); font-size: 20px; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: var(--text1); }
+  .edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .edit-field-full { grid-column: span 2; }
+
+  /* ── TOAST ── */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--bg2); border: 1px solid var(--border2); border-radius: 7px;
+    padding: 12px 16px; font-size: 13px; color: var(--text1);
+    min-width: 260px; animation: toastIn .3s ease;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .toast.success { border-color: #2a5a2a; }
+  .toast.error { border-color: #5a2a2a; }
+  .toast.info { border-color: #2a2a5a; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-bar-wrap { height: 3px; background: var(--border); border-radius: 0 0 8px 8px; overflow: hidden; display: none; }
+  .progress-bar-wrap.visible { display: block; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .4s ease; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    header { padding: 0 14px; }
+    main { padding: 18px 12px 40px; }
+    .table-head, .card-summary { grid-template-columns: 52px 1fr 110px 80px; }
+    .th:nth-child(3), .card-sub:nth-child(3) { display: none; }
+    .expand-grid { grid-template-columns: 1fr 1fr; }
+    .modal { width: calc(100vw - 32px); }
+    .edit-grid { grid-template-columns: 1fr; }
+    .edit-field-full { grid-column: span 1; }
+    .logo-badge { display: none; }
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
 </style>
 </head>
 <body>
 
-<div class="hdr">
-  <div class="brand">
-    <div class="brand-icon">🪪</div>
-    <div>
-      <h1>Visiting Card Organizer</h1>
-      <p>Upload images → AI reads & matches → Excel export</p>
-    </div>
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <svg class="logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <line x1="7" y1="9" x2="17" y2="9"/>
+      <line x1="7" y1="12" x2="14" y2="12"/>
+      <line x1="7" y1="15" x2="11" y2="15"/>
+    </svg>
+    <span class="logo-text">CardScan Pro</span>
+    <span class="logo-badge">AI-Powered</span>
   </div>
-  <div class="hdr-right">
-    <div class="key-wrap" id="keyWrap" onclick="event.stopPropagation()">
-      <select class="provider-sel" id="apiProvider" onclick="event.stopPropagation()" onchange="try{localStorage.setItem('vc_p',this.value)}catch(e){}">
-        <option value="anthropic">Claude</option>
-        <option value="gemini">Gemini</option>
-      </select>
-      <span>🔑</span>
-      <input type="password" id="apiKey" placeholder="Paste API key, then click Save"
-        onclick="event.stopPropagation()"
-        onkeydown="if(event.key==='Enter')saveKey()">
-      <button class="key-toggle" onclick="event.stopPropagation();toggleKeyVisibility()" title="Show/hide">👁</button>
-      <button class="key-save" onclick="event.stopPropagation();saveKey()">Save</button>
-      <button class="key-save" style="background:var(--s3);border:1px solid var(--b2);color:var(--dim2)" onclick="event.stopPropagation();testKey()">Test</button>
-      <span class="key-saved-badge" id="keySavedBadge">✓ Saved</span>
-    </div>
-    <button class="btn btn-green" id="xlBtn" onclick="exportExcel()" style="display:none">📊 Download Excel</button>
-    <button class="btn btn-ghost" id="clrBtn" onclick="clearAll()" style="display:none">🗑 Clear All</button>
+  <div class="header-actions">
+    <button class="btn btn-settings" onclick="toggleApiPanel()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      API Settings
+    </button>
+    <button id="clearBtn" class="btn btn-danger" onclick="clearAll()" style="display:none">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      Clear All
+    </button>
+    <button id="exportBtn" class="btn btn-export" onclick="exportExcel()" disabled>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span id="exportLabel">Export to Excel</span>
+    </button>
   </div>
+</header>
+
+<!-- PROGRESS BAR -->
+<div class="progress-bar-wrap" id="progressWrap">
+  <div class="progress-bar" id="progressBar" style="width:0%"></div>
 </div>
 
-<div class="main">
+<main>
 
-  <!-- UPLOAD -->
-  <div class="drop" id="dropZone"
-    onclick="document.getElementById('fileIn').click()"
-    ondragover="event.preventDefault();this.classList.add('over')"
-    ondragleave="this.classList.remove('over')"
-    ondrop="event.preventDefault();this.classList.remove('over');processFiles(event.dataTransfer.files)">
-    <input type="file" id="fileIn" accept="image/*" multiple onchange="processFiles(this.files);this.value=''">
-    <div class="drop-icon">🪪</div>
-    <h2>Click or Drop All Visiting Card Images Here</h2>
-    <p>Any order — front and back mixed — AI will match them automatically</p>
-    <div class="drop-hint">🧠 AI reads each card's name & phone → matches front+back → fills Excel</div>
-  </div>
-
-  <!-- PROGRESS -->
-  <div class="prog-panel" id="progPanel">
-    <div class="prog-top">
-      <h3 id="progTitle">🔍 Reading Cards...</h3>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('fileIn').click()">+ Add More Images</button>
-    </div>
-    <div class="prog-bar-wrap">
-      <div class="prog-lbl"><span id="progLbl">Starting...</span><span id="progNum">0 / 0</span></div>
-      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
-    </div>
-    <div class="thumb-row" id="thumbRow"></div>
-    <div class="prog-status" id="progStatus"></div>
-    <div class="prog-actions" id="progActions" style="display:none">
-      <button class="btn btn-blue" onclick="buildCards()">✅ Create Cards & Fill Details</button>
-      <button class="btn btn-ghost btn-sm" onclick="rescan()">🔄 Re-Scan</button>
-    </div>
-  </div>
-
-  <!-- EXCEL PREVIEW -->
-  <div class="excel-wrap" id="excelDiv">
-    <div class="excel-head">
-      <h3>📊 Excel Preview — Auto Updated</h3>
-      <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇ Download Excel</button>
-    </div>
-    <div class="tbl-scroll">
-      <table>
-        <thead><tr>
-          <th>#</th><th>Party Name</th><th>Owner Name</th><th>Designation</th>
-          <th>Mobile</th><th>Alt No.</th><th>Email</th><th>Website</th>
-          <th>Address</th><th>City</th><th>State</th><th>Pincode</th>
-        </tr></thead>
-        <tbody id="tblBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- CARDS -->
-  <div id="cardsSection" style="display:none">
-    <div class="cards-header">
-      <h2>Visiting Cards</h2>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <span class="badge" id="cardBadge">0 cards</span>
-        <button class="btn btn-blue btn-sm" onclick="document.getElementById('fileIn').click()">+ Add More</button>
+  <!-- API SETTINGS PANEL -->
+  <div class="api-panel" id="apiPanel">
+    <div class="api-panel-header">
+      <span class="api-panel-title">⚙ API Configuration</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="apiStatusLabel" style="font-size:11px;font-family:var(--mono);color:var(--text3)">No API configured</span>
+        <button class="btn btn-sm btn-ghost" onclick="toggleApiPanel()">Close</button>
       </div>
+    </div>
+
+    <div class="api-tabs">
+      <button class="api-tab active" id="tab-claude" onclick="switchTab('claude')">
+        <div class="dot"></div> Claude (Anthropic)
+        <span class="free-badge limited">Free Tier</span>
+      </button>
+      <button class="api-tab" id="tab-gemini" onclick="switchTab('gemini')">
+        <div class="dot"></div> Gemini (Google)
+        <span class="free-badge free">Free</span>
+      </button>
+      <button class="api-tab" id="tab-openai" onclick="switchTab('openai')">
+        <div class="dot"></div> GPT-4o (OpenAI)
+        <span class="free-badge limited">Credits</span>
+      </button>
+    </div>
+
+    <!-- Claude Tab -->
+    <div class="api-tab-content active" id="content-claude">
+      <div class="api-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Anthropic API Key</label>
+          <input class="form-input" type="password" id="claudeKey" placeholder="sk-ant-api03-..." oninput="saveKeys()">
+        </div>
+        <button class="btn btn-primary" onclick="testApi('claude')">Test Key</button>
+      </div>
+      <div class="api-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>Get your free API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> — New accounts get $5 free credits. Model: <strong style="color:var(--text2)">claude-haiku-3-5</strong> (cheapest &amp; fast). Keys are stored locally in your browser only.</div>
+      </div>
+    </div>
+
+    <!-- Gemini Tab -->
+    <div class="api-tab-content" id="content-gemini">
+      <div class="api-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Google Gemini API Key</label>
+          <input class="form-input" type="password" id="geminiKey" placeholder="AIzaSy..." oninput="saveKeys()">
+        </div>
+        <button class="btn btn-primary" onclick="testApi('gemini')">Test Key</button>
+      </div>
+      <div class="api-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>Get your <strong style="color:var(--green)">100% free</strong> API key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> — Gemini 1.5 Flash is free with generous rate limits (15 req/min, 1500/day). Best free option. Keys stored in browser only.</div>
+      </div>
+    </div>
+
+    <!-- OpenAI Tab -->
+    <div class="api-tab-content" id="content-openai">
+      <div class="api-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">OpenAI API Key</label>
+          <input class="form-input" type="password" id="openaiKey" placeholder="sk-..." oninput="saveKeys()">
+        </div>
+        <button class="btn btn-primary" onclick="testApi('openai')">Test Key</button>
+      </div>
+      <div class="api-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a> — New accounts get $5 free credits. Model: <strong style="color:var(--text2)">gpt-4o-mini</strong> (very cost-effective for vision tasks). Keys stored in browser only.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NO API WARNING -->
+  <div id="noApiWarn" style="display:none;background:#1a1000;border:1px solid #3a2800;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffaa44" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <div style="font-size:13px;color:#cc9944">
+      <strong style="color:#ffaa44">No API key configured.</strong> Click <strong style="color:#ffaa44">API Settings</strong> above to add your key. Gemini is free and recommended for zero cost.
+    </div>
+  </div>
+
+  <!-- DROP ZONE -->
+  <div class="dropzone" id="dropzone"
+    ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)"
+    onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileInput(this)">
+    <div class="dropzone-icon">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4444aa" stroke-width="1">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <line x1="7" y1="9" x2="17" y2="9" stroke-width="1.2"/>
+        <line x1="7" y1="12" x2="14" y2="12" stroke-width="1.2"/>
+        <line x1="7" y1="15" x2="10" y2="15" stroke-width="1.2"/>
+      </svg>
+    </div>
+    <div class="dropzone-title">Drop business card images here or <span>click to browse</span></div>
+    <div class="dropzone-sub" style="margin-top:6px">JPG · PNG · WebP · GIF &nbsp;|&nbsp; Bulk upload supported &nbsp;|&nbsp; All processing done locally via your API key</div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat"><span class="stat-val" id="statTotal" style="color:#8888cc">0</span><span class="stat-label">Total</span></div>
+    <div class="stat"><span class="stat-val" id="statDone" style="color:var(--accent2)">0</span><span class="stat-label">Extracted</span></div>
+    <div class="stat"><span class="stat-val" id="statProc" style="color:var(--green)">0</span><span class="stat-label">Processing</span></div>
+    <div class="stat"><span class="stat-val" id="statErr" style="color:var(--red)">0</span><span class="stat-label">Failed</span></div>
+    <div class="stat"><span class="stat-val" id="statQueued" style="color:#8888aa">0</span><span class="stat-label">Queued</span></div>
+    <div class="scanning-label" id="scanLabel">
+      <span class="spin">⟳</span> AI scanning…
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar" id="filterBar">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="search-input" type="text" placeholder="Search by name, company, email…" id="searchInput" oninput="renderTable()">
+    </div>
+    <select class="filter-select" id="filterStatus" onchange="renderTable()">
+      <option value="all">All Cards</option>
+      <option value="done">Extracted Only</option>
+      <option value="error">Failed Only</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="retryFailed()" id="retryBtn" style="display:none">Retry Failed</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap" id="tableWrap">
+    <div class="table-head">
+      <span class="th"></span>
+      <span class="th">Name</span>
+      <span class="th">Company</span>
+      <span class="th">Phone</span>
+      <span class="th">Status</span>
+      <span class="th"></span>
     </div>
     <div id="cardList"></div>
   </div>
 
-  <div class="empty-state on" id="emptyMsg">
-    <div class="icon">🪪</div>
-    <p>No cards yet — upload images above.</p>
+  <!-- EMPTY STATE -->
+  <div class="empty-state visible" id="emptyState">
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#2a2a44" stroke-width="1" style="margin-bottom:14px">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <line x1="7" y1="9" x2="17" y2="9"/>
+      <line x1="7" y1="12" x2="14" y2="12"/>
+    </svg>
+    <div style="font-family:var(--mono);font-size:12px;letter-spacing:1px">No cards scanned yet</div>
+    <div style="font-size:12px;margin-top:6px">Configure your API key above, then drop business card images to begin</div>
   </div>
 
+</main>
+
+<!-- EDIT MODAL -->
+<div class="modal-backdrop" id="editModal" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">✏ Edit Extracted Data</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="edit-grid" id="editFields"></div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
 </div>
-<div class="toast" id="toastEl"></div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
 
 <script>
-// ─────────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────────
-var imgs = [];       // all uploaded raw images
-var groups = [];     // matched groups: {front, back(optional), info}
-var cards = [];      // final card objects with details
-var imgIdCtr = 0, cardIdCtr = 0;
-var scanTimer = null;
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const FIELDS = ["name","title","company","email","phone","website","address","linkedin","notes"];
+const LABELS = {
+  name:"Full Name", title:"Job Title", company:"Company / Firm",
+  email:"Email Address", phone:"Phone / Mobile", website:"Website",
+  address:"Address", linkedin:"LinkedIn", notes:"Notes"
+};
+const ICONS = {
+  name:"👤", title:"🏷️", company:"🏢", email:"✉️",
+  phone:"📱", website:"🌐", address:"📍", linkedin:"🔗", notes:"📝"
+};
 
-// ─────────────────────────────────────────────
-// API
-// ─────────────────────────────────────────────
-function getKey(){ return document.getElementById('apiKey').value.trim(); }
+let cards = [];
+let editingId = null;
+let activeTab = 'claude';
+let isProcessing = false;
+let processQueue = [];
 
-function getProvider(){ return (document.getElementById('apiProvider')||{}).value || 'anthropic'; }
-
-async function callAPI(messages, maxTokens){
-  var key = getKey();
-  if(!key){ toast('Enter your API Key (top right) and click Save','err'); throw new Error('no key'); }
-  var provider = getProvider();
-
-  if(provider === 'gemini'){
-    var parts = [];
-    messages.forEach(function(msg){
-      if(Array.isArray(msg.content)){
-        msg.content.forEach(function(block){
-          if(block.type === 'text') parts.push({text: block.text});
-          else if(block.type === 'image') parts.push({inlineData:{mimeType: block.source.media_type, data: block.source.data}});
-        });
-      } else {
-        parts.push({text: String(msg.content)});
-      }
-    });
-    var payload = {
-      contents:[{role:'user', parts:parts}],
-      generationConfig:{maxOutputTokens: maxTokens||800}
-    };
-    var directUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+encodeURIComponent(key);
-    // Try direct fetch first (works when served over http/https)
-    // If that fails due to CORS (file:// origin), fall back to a public CORS proxy
-    async function tryFetch(url, body){
-      var r = await fetch(url, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-      });
-      var d = await r.json();
-      if(d.error) throw new Error(d.error.message || JSON.stringify(d.error));
-      var cand = (d.candidates||[])[0];
-      if(!cand) throw new Error('Empty response from Gemini (status '+r.status+')');
-      return (cand.content.parts||[]).map(function(p){return p.text||'';}).join('');
-    }
+// ─── INIT ────────────────────────────────────────────────────────────────────
+(function init() {
+  const saved = localStorage.getItem('cardscan_keys');
+  if (saved) {
     try {
-      return await tryFetch(directUrl, payload);
-    } catch(e1) {
-      // If CORS/network error, route through corsproxy.io
-      if(e1.message && e1.message.match(/fetch|network|CORS/i)){
-        try {
-          var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(directUrl);
-          return await tryFetch(proxyUrl, payload);
-        } catch(e2) {
-          throw new Error('Both direct and proxy failed. Direct: '+e1.message+' | Proxy: '+e2.message);
-        }
-      }
-      throw e1;
-    }
-  } else {
-    // Anthropic — try direct, then CORS proxy fallback for file:// origins
-    var aHeaders = {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    };
-    var aBody = { model: 'claude-sonnet-4-20250514', max_tokens: maxTokens||500, messages: messages };
-    async function tryAnthropic(url, extraHeaders){
-      var h = Object.assign({}, aHeaders, extraHeaders||{});
-      var r = await fetch(url, {method:'POST', headers:h, body:JSON.stringify(aBody)});
-      var d = await r.json();
-      if(d.error) throw new Error(d.error.message);
-      return d.content.map(function(b){ return b.text||''; }).join('');
-    }
-    try {
-      return await tryAnthropic('https://api.anthropic.com/v1/messages');
-    } catch(e1) {
-      if(e1.message && e1.message.match(/fetch|network|CORS/i)){
-        try {
-          var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.anthropic.com/v1/messages');
-          return await tryAnthropic(proxyUrl);
-        } catch(e2) {
-          throw new Error('Both direct and proxy failed. Direct: '+e1.message+' | Proxy: '+e2.message);
-        }
-      }
-      throw e1;
-    }
+      const k = JSON.parse(saved);
+      if (k.claude) document.getElementById('claudeKey').value = k.claude;
+      if (k.gemini) document.getElementById('geminiKey').value = k.gemini;
+      if (k.openai) document.getElementById('openaiKey').value = k.openai;
+      if (k.activeTab) { activeTab = k.activeTab; switchTab(activeTab, true); }
+    } catch(e) {}
   }
+  // Check for a saved preferred tab with a key
+  updateApiStatus();
+  // Show no-API warning if needed
+  updateNoApiWarning();
+})();
+
+// ─── API PANEL ───────────────────────────────────────────────────────────────
+function toggleApiPanel() {
+  const panel = document.getElementById('apiPanel');
+  panel.classList.toggle('open');
 }
 
-function extractJSON(raw){
-  raw = (raw||'').replace(/```json|```/g,'').trim();
-  var s = raw.indexOf('{'), e = raw.lastIndexOf('}');
-  if(s>=0 && e>s) return JSON.parse(raw.slice(s,e+1));
-  throw new Error('no JSON');
+function switchTab(tab, silent) {
+  activeTab = tab;
+  document.querySelectorAll('.api-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.api-tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('content-' + tab).classList.add('active');
+  if (!silent) saveKeys();
+  updateApiStatus();
 }
 
-// ─────────────────────────────────────────────
-// UPLOAD & FILE READING
-// ─────────────────────────────────────────────
-function processFiles(files){
-  var arr = Array.from(files).filter(function(f){ return f.type.startsWith('image/'); });
-  if(!arr.length){ toast('No image files found','err'); return; }
-  var loaded = 0;
-  document.getElementById('progPanel').classList.add('on');
-  arr.forEach(function(file){
-    var reader = new FileReader();
-    reader.onload = function(e){
-      imgs.push({ id: imgIdCtr++, url: e.target.result, mt: file.type||'image/jpeg',
-        fname: file.name, name:'', nameHindi:'', phone:'', company:'', companyHindi:'', email:'', side:'',
-        status:'pending'
-      });
-      loaded++;
-      renderThumbs();
-      if(loaded === arr.length){
-        clearTimeout(scanTimer);
-        scanTimer = setTimeout(scanAllImages, 500);
-      }
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-// ─────────────────────────────────────────────
-// THUMBS
-// ─────────────────────────────────────────────
-function renderThumbs(){
-  var row = document.getElementById('thumbRow');
-  row.innerHTML = '';
-  imgs.forEach(function(img){
-    var cls = 'th ' + (img.status==='scanning'?'scanning':img.status==='done'?'matched':img.status==='fail'?'failed':'');
-    var icon = img.status==='scanning'?'⏳':img.status==='done'?'✅':img.status==='fail'?'❌':'🕐';
-    var label = img.name || img.fname.slice(0,14);
-    var d = document.createElement('div');
-    d.className = cls; d.id = 'th-'+img.id;
-    d.innerHTML = '<img src="'+img.url+'"><div class="th-overlay">'+icon+'</div><div class="th-label">'+label+'</div>';
-    row.appendChild(d);
-  });
-}
-
-function refreshThumb(img){
-  var d = document.getElementById('th-'+img.id);
-  if(!d) return;
-  d.className = 'th '+(img.status==='scanning'?'scanning':img.status==='done'?'matched':img.status==='fail'?'failed':'');
-  d.querySelector('.th-overlay').textContent = img.status==='scanning'?'⏳':img.status==='done'?'✅':img.status==='fail'?'❌':'🕐';
-  d.querySelector('.th-label').textContent = img.name||img.fname.slice(0,14);
-}
-
-function setProgress(done, total, label){
-  var pct = total ? Math.round(done/total*100) : 0;
-  document.getElementById('progFill').style.width = pct+'%';
-  document.getElementById('progNum').textContent = done+' / '+total;
-  document.getElementById('progLbl').textContent = label||'';
-}
-
-// ─────────────────────────────────────────────
-// STEP 1: SCAN ALL IMAGES — read name+phone from each card
-// ─────────────────────────────────────────────
-async function scanAllImages(){
-  // Check key before starting
-  if(!getKey()){ toast('Please paste your API key and click Save first!','err'); return; }
-
-  var toScan = imgs.filter(function(i){ return i.status==='pending'; });
-  var total = imgs.length;
-  var done = imgs.filter(function(i){ return i.status==='done'||i.status==='fail'; }).length;
-  document.getElementById('progTitle').textContent = '🔍 Reading Each Card...';
-  document.getElementById('progActions').style.display = 'none';
-  setProgress(done, total, 'Reading card text...');
-
-  for(var i=0; i<toScan.length; i++){
-    var img = toScan[i];
-    img.status = 'scanning'; refreshThumb(img);
-    try{
-      var b64 = img.url.split(',')[1] || img.url;
-      var raw = await callAPI([{
-        role:'user',
-        content:[
-          {type:'image', source:{type:'base64', media_type:img.mt, data:b64}},
-          {type:'text', text:'Look at this image. Find the visiting/business card in it (ignore hands, table, background). Read the text ON the card only.\n\nIMPORTANT: The card may have text in Hindi (Devanagari script) AND/OR English. Read both.\n\nReturn ONLY this JSON:\n{"name":"person full name in English (if Hindi name on card, transliterate it to English letters)","nameHindi":"person name in Hindi/Devanagari if present, else empty","company":"company name in English (transliterate if Hindi)","companyHindi":"company name in Hindi if present, else empty","phone":"phone number on card","email":"email address on card","side":"front or back"}'}
-        ]
-      }], 300);
-      var info = extractJSON(raw);
-      img.name        = (info.name||'').trim();
-      img.nameHindi   = (info.nameHindi||'').trim();
-      img.phone       = (info.phone||'').replace(/\D/g,'');
-      img.company     = (info.company||'').trim();
-      img.companyHindi= (info.companyHindi||'').trim();
-      img.email       = (info.email||'').trim().toLowerCase();
-      img.side        = (info.side||'').trim();
-      img.status  = 'done';
-    } catch(ex){
-      console.error('Scan error:', ex);
-      img.status = 'fail';
-      img.errorMsg = ex.message || 'Unknown error';
-      // If first image fails with auth error, stop all
-      if(i === 0 && (ex.message||'').match(/key|auth|401|403|invalid/i)){
-        toast('API Error: ' + (ex.message||'Check your key'), 'err');
-        document.getElementById('progTitle').textContent = '❌ API Error — Check Key';
-        document.getElementById('progStatus').textContent = ex.message || 'Authentication failed';
-        imgs.forEach(function(im){ if(im.status==='pending') im.status='fail'; im.errorMsg=ex.message; });
-        renderThumbs();
-        setProgress(total, total, 'Failed');
-        return;
-      }
-    }
-    done++;
-    refreshThumb(img);
-    setProgress(done, total, done < total ? 'Reading card '+(i+2)+' of '+total+'...' : 'Done! Matching pairs...');
-  }
-
-  matchAndShowResult();
-}
-
-// ─────────────────────────────────────────────
-// STEP 2: MATCH — same name+phone = same card
-// ─────────────────────────────────────────────
-function normName(s){
-  return (s||'').toLowerCase().replace(/[^a-z0-9]/g,'').trim();
-}
-function normPhone(s){
-  return (s||'').replace(/\D/g,'').slice(-8); // last 8 digits
-}
-function similarity(a, b){
-  a = normName(a); b = normName(b);
-  if(!a||!b) return 0;
-  if(a===b) return 1;
-  var longer = a.length>b.length?a:b, shorter = a.length>b.length?b:a;
-  var matches = 0;
-  for(var i=0;i<shorter.length;i++){
-    if(longer.indexOf(shorter[i])>=0) matches++;
-  }
-  return matches/longer.length;
-}
-
-function matchAndShowResult(){
-  groups = [];
-  var used = new Set();
-  var done = imgs.filter(function(i){ return i.status==='done'; });
-
-  done.forEach(function(img){
-    if(used.has(img.id)) return;
-    // Find best matching partner
-    var best = null, bestScore = 0;
-    done.forEach(function(other){
-      if(other.id === img.id || used.has(other.id)) return;
-      var sc = 0;
-
-      // Phone match — strongest signal (same card = same phone)
-      var ph1 = normPhone(img.phone), ph2 = normPhone(other.phone);
-      if(ph1 && ph2 && ph1.length>=6 && ph1===ph2) sc += 70;
-      else if(ph1 && ph2 && ph1.length>=4 && ph1===ph2) sc += 40;
-
-      // Email — full match or domain match
-      var em1 = (img.email||'').toLowerCase();
-      var em2 = (other.email||'').toLowerCase();
-      var dom1 = em1.split('@')[1]||'';
-      var dom2 = em2.split('@')[1]||'';
-      if(em1 && em2 && em1===em2) sc += 70;           // exact email match
-      else if(dom1 && dom2 && dom1===dom2) sc += 50;  // same domain e.g. @studiokalpavas.com
-
-      // Company name — check English + Hindi both
-      var cs = Math.max(
-        similarity(img.company,      other.company),
-        similarity(img.companyHindi, other.companyHindi),
-        similarity(img.company,      other.companyHindi),
-        similarity(img.companyHindi, other.company)
-      );
-      if(cs > 0.75) sc += 55;
-      else if(cs > 0.55) sc += 35;
-      else if(cs > 0.35) sc += 15;
-      if(img.company && other.company && cs < 0.15) sc -= 40;
-
-      // Person name — check English + Hindi both
-      var ns = Math.max(
-        similarity(img.name,      other.name),
-        similarity(img.nameHindi, other.nameHindi),
-        similarity(img.name,      other.nameHindi),
-        similarity(img.nameHindi, other.name)
-      );
-      if(ns > 0.75) sc += 40;
-      else if(ns > 0.55) sc += 22;
-      else if(ns > 0.35) sc += 10;
-      if(img.name && other.name && ns < 0.15) sc -= 40;
-
-      // Front + back bonus
-      if((img.side==='front'&&other.side==='back')||(img.side==='back'&&other.side==='front')) sc += 20;
-
-      if(sc > bestScore){ bestScore = sc; best = other; }
-    });
-
-    if(best && bestScore >= 35){
-      // Confident pair found
-      var front = (img.side==='back') ? best : img;
-      var back  = (img.side==='back') ? img  : best;
-      groups.push({ front:front, back:back, paired:true });
-      used.add(img.id); used.add(best.id);
-    } else {
-      // No confident match — single image card
-      groups.push({ front:img, back:null, paired:false });
-      used.add(img.id);
-    }
-  });
-
-  // Failed scans — add as single
-  imgs.filter(function(i){ return i.status==='fail' && !used.has(i.id); }).forEach(function(img){
-    groups.push({ front:img, back:null, paired:false });
-    used.add(img.id);
-  });
-
-  var paired = groups.filter(function(g){ return g.paired; }).length;
-  var single = groups.filter(function(g){ return !g.paired; }).length;
-
-  document.getElementById('progTitle').textContent = '✅ Matching Complete';
-  document.getElementById('progStatus').textContent =
-    paired+' pairs matched  |  '+single+' single-side cards  |  Click below to create cards & fill details';
-  document.getElementById('progActions').style.display = 'flex';
-  setProgress(imgs.length, imgs.length, 'All images read!');
-}
-
-// ─────────────────────────────────────────────
-// STEP 3: BUILD CARDS + AUTO FILL DETAILS
-// ─────────────────────────────────────────────
-function buildCards(){
-  document.getElementById('progPanel').classList.remove('on');
-  groups.forEach(function(g){
-    createCard(g.front, g.back);
-  });
-  groups = []; imgs = [];
-  toast('Cards created! AI is filling details...','ok');
-}
-
-function createCard(front, back){
-  var id = cardIdCtr++;
-  var card = {
-    id:id, front:front, back:back,
-    partyName:'', ownerName:'', designation:'',
-    phone:'', altPhone:'', email:'', website:'',
-    address:'', city:'', state:'', pincode:''
+function saveKeys() {
+  const keys = {
+    claude: document.getElementById('claudeKey').value,
+    gemini: document.getElementById('geminiKey').value,
+    openai: document.getElementById('openaiKey').value,
+    activeTab: activeTab
   };
-  cards.push(card);
-  updateView();
-  renderCard(card);
-  fillDetails(card);
+  localStorage.setItem('cardscan_keys', JSON.stringify(keys));
+  updateApiStatus();
+  updateNoApiWarning();
 }
 
-// ─────────────────────────────────────────────
-// RENDER CARD
-// ─────────────────────────────────────────────
-function renderCard(card){
-  var num = cards.findIndex(function(c){ return c.id===card.id; })+1;
-  var div = document.createElement('div');
-  div.className = 'card'; div.id = 'card-'+card.id;
-
-  var imgHTML = card.back
-    ? '<div class="img-box"><span class="img-box-label">FRONT</span><img src="'+card.front.url+'"></div>'
-      +'<div class="img-box"><span class="img-box-label">BACK</span><img src="'+card.back.url+'"></div>'
-    : '<div class="img-box-single"><span class="img-box-label" style="color:var(--gold)">SINGLE</span><img src="'+card.front.url+'"></div>';
-
-  div.innerHTML =
-    '<div class="card-head">'
-      +'<div class="card-head-left">'
-        +'<div class="card-num">'+num+'</div>'
-        +'<div><div class="card-title" id="ct-'+card.id+'">Card #'+num+'</div>'
-        +'<div class="card-sub" id="cs-'+card.id+'"></div></div>'
-      +'</div>'
-      +'<button class="btn btn-del" onclick="deleteCard('+card.id+')">🗑 Delete</button>'
-    +'</div>'
-    +'<div class="card-body">'
-      +'<div class="card-imgs">'+imgHTML+'</div>'
-      +'<div class="card-fields">'
-        +'<div class="field-status loading" id="fs-'+card.id+'"><div class="spin"></div> Reading card details...</div>'
-        +'<div class="fields" id="ff-'+card.id+'">'+fieldsHTML(card)+'</div>'
-      +'</div>'
-    +'</div>';
-  document.getElementById('cardList').appendChild(div);
+function getActiveKey() {
+  const id = activeTab + 'Key';
+  return document.getElementById(id)?.value?.trim() || '';
 }
 
-function fieldsHTML(c){
-  function v(x){ return (x||'').replace(/"/g,'&quot;'); }
-  return ''
-    +'<div class="field"><label>🏢 Party Name</label><input value="'+v(c.partyName)+'" placeholder="Company / Firm" oninput="setField('+c.id+',\'partyName\',this.value)"></div>'
-    +'<div class="field"><label>👤 Owner Name</label><input value="'+v(c.ownerName)+'" placeholder="Person Name" oninput="setField('+c.id+',\'ownerName\',this.value)"></div>'
-    +'<div class="field"><label>💼 Designation</label><input value="'+v(c.designation)+'" placeholder="Job Title" oninput="setField('+c.id+',\'designation\',this.value)"></div>'
-    +'<div class="field"><label>📞 Mobile</label><input value="'+v(c.phone)+'" placeholder="Primary Number" oninput="setField('+c.id+',\'phone\',this.value)"></div>'
-    +'<div class="field"><label>📞 Alt Number</label><input value="'+v(c.altPhone)+'" placeholder="Second Number" oninput="setField('+c.id+',\'altPhone\',this.value)"></div>'
-    +'<div class="field"><label>📧 Email</label><input value="'+v(c.email)+'" placeholder="Email Address" oninput="setField('+c.id+',\'email\',this.value)"></div>'
-    +'<div class="field"><label>🌐 Website</label><input value="'+v(c.website)+'" placeholder="Website" oninput="setField('+c.id+',\'website\',this.value)"></div>'
-    +'<div class="field wide"><label>📍 Address</label><input value="'+v(c.address)+'" placeholder="Full Address" oninput="setField('+c.id+',\'address\',this.value)"></div>'
-    +'<div class="field"><label>🏙 City</label><input value="'+v(c.city)+'" placeholder="City" oninput="setField('+c.id+',\'city\',this.value)"></div>'
-    +'<div class="field"><label>🗺 State</label><input value="'+v(c.state)+'" placeholder="State" oninput="setField('+c.id+',\'state\',this.value)"></div>'
-    +'<div class="field"><label>📮 Pincode</label><input value="'+v(c.pincode)+'" placeholder="Pincode" oninput="setField('+c.id+',\'pincode\',this.value)"></div>';
-}
-
-function setField(id, field, val){
-  var c = cards.find(function(x){ return x.id===id; });
-  if(!c) return;
-  c[field] = val;
-  if(field==='ownerName'||field==='partyName'){
-    var t = document.getElementById('ct-'+id);
-    var s = document.getElementById('cs-'+id);
-    if(t) t.textContent = c.ownerName || c.partyName || 'Card #'+(cards.findIndex(function(x){return x.id===id;})+1);
-    if(s) s.textContent = c.partyName||'';
+function updateApiStatus() {
+  const key = getActiveKey();
+  const label = document.getElementById('apiStatusLabel');
+  if (key) {
+    const names = { claude: 'Claude (Anthropic)', gemini: 'Gemini (Google)', openai: 'GPT-4o Mini (OpenAI)' };
+    label.textContent = '✓ ' + (names[activeTab] || activeTab) + ' active';
+    label.style.color = 'var(--green)';
+  } else {
+    label.textContent = 'No API configured';
+    label.style.color = 'var(--text3)';
   }
-  refreshTable();
+  // Update tab dots
+  ['claude','gemini','openai'].forEach(t => {
+    const dot = document.querySelector('#tab-' + t + ' .dot');
+    const k = document.getElementById(t + 'Key')?.value?.trim();
+    if (dot) dot.style.background = k ? 'var(--green)' : 'var(--border2)';
+  });
 }
 
-// ─────────────────────────────────────────────
-// STEP 4: AI AUTO-FILL DETAILS
-// ─────────────────────────────────────────────
-async function fillDetails(card){
-  var st = document.getElementById('fs-'+card.id);
-  try{
-    var content = [];
-    // Add front image
-    var fb = card.front.url.split(',')[1]||card.front.url;
-    content.push({type:'image', source:{type:'base64', media_type:card.front.mt||'image/jpeg', data:fb}});
-    // Add back image if available
-    if(card.back){
-      var bb = card.back.url.split(',')[1]||card.back.url;
-      content.push({type:'image', source:{type:'base64', media_type:card.back.mt||'image/jpeg', data:bb}});
+function updateNoApiWarning() {
+  const key = getActiveKey();
+  const warn = document.getElementById('noApiWarn');
+  warn.style.display = key ? 'none' : 'flex';
+}
+
+// ─── TEST API ─────────────────────────────────────────────────────────────────
+async function testApi(provider) {
+  const keyEl = document.getElementById(provider + 'Key');
+  const key = keyEl?.value?.trim();
+  if (!key) { toast('Please enter an API key first.', 'error'); return; }
+
+  toast('Testing connection…', 'info');
+  try {
+    if (provider === 'claude') {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-3-5-20241022', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+    } else if (provider === 'gemini') {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'Hi' }] }] })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+    } else if (provider === 'openai') {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
     }
-    content.push({type:'text', text:'These are images of a visiting card. Read ALL text printed on the card — ignore hands, background, angle, shadows.\n\nExtract every contact detail. Return ONLY this JSON:\n{"partyName":"company or firm name","ownerName":"person full name (no titles like Dr/Mr/Mrs/Sh)","designation":"job title","phone":"primary phone number","altPhone":"second phone number if any","email":"email address","website":"website url","address":"complete street address","city":"city name","state":"state name","pincode":"pin code"}'});
-
-    var raw = await callAPI([{role:'user', content:content}], 800);
-    var p = extractJSON(raw);
-
-    card.partyName   = p.partyName   || '';
-    card.ownerName   = p.ownerName   || '';
-    card.designation = p.designation || '';
-    card.phone       = p.phone       || '';
-    card.altPhone    = p.altPhone    || '';
-    card.email       = p.email       || '';
-    card.website     = p.website     || '';
-    card.address     = p.address     || '';
-    card.city        = p.city        || '';
-    card.state       = p.state       || '';
-    card.pincode     = p.pincode     || '';
-
-    // Update fields in DOM
-    var ff = document.getElementById('ff-'+card.id);
-    if(ff) ff.innerHTML = fieldsHTML(card);
-    var t = document.getElementById('ct-'+card.id);
-    var s = document.getElementById('cs-'+card.id);
-    if(t) t.textContent = card.ownerName || card.partyName || 'Card #'+(cards.findIndex(function(x){return x.id===card.id;})+1);
-    if(s) s.textContent = card.partyName || '';
-    if(st){ st.className='field-status done'; st.innerHTML='✅ Details filled!'; }
-    setTimeout(function(){ if(st) st.style.display='none'; }, 2500);
-    refreshTable();
-  } catch(ex){
-    console.error('fillDetails error:', ex);
-    var errMsg = ex.message || 'Unknown error';
-    if(st){ st.className='field-status fail'; st.innerHTML='⚠️ Could not read: ' + errMsg; }
-    toast('Fill error: ' + errMsg, 'err');
-    refreshTable();
+    toast('✓ API key is valid and working!', 'success');
+    saveKeys();
+  } catch(e) {
+    toast('✗ Connection failed: ' + e.message, 'error');
   }
 }
 
-// ─────────────────────────────────────────────
-// EXCEL TABLE + EXPORT
-// ─────────────────────────────────────────────
-function refreshTable(){
-  var tb = document.getElementById('tblBody');
-  if(!tb) return;
-  tb.innerHTML = '';
-  cards.forEach(function(c, i){
-    var tr = document.createElement('tr');
-    [i+1, c.partyName, c.ownerName, c.designation,
-     c.phone, c.altPhone, c.email, c.website,
-     c.address, c.city, c.state, c.pincode
-    ].forEach(function(val){
-      var td = document.createElement('td');
-      td.textContent = val||''; td.title = val||'';
-      tr.appendChild(td);
-    });
-    tb.appendChild(tr);
+// ─── DRAG & DROP ─────────────────────────────────────────────────────────────
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.add('drag');
+}
+function handleDragLeave(e) {
+  if (!document.getElementById('dropzone').contains(e.relatedTarget))
+    document.getElementById('dropzone').classList.remove('drag');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) addFiles(files);
+  else toast('Please drop image files only.', 'error');
+}
+function handleFileInput(inp) {
+  addFiles([...inp.files]);
+  inp.value = '';
+}
+
+// ─── FILE PROCESSING ─────────────────────────────────────────────────────────
+function addFiles(files) {
+  if (!getActiveKey()) {
+    toast('Please configure an API key first.', 'error');
+    document.getElementById('apiPanel').classList.add('open');
+    return;
+  }
+  const newCards = files.map(f => ({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2),
+    file: f,
+    preview: URL.createObjectURL(f),
+    status: 'queued',
+    data: null,
+    error: null
+  }));
+  cards = [...cards, ...newCards];
+  renderAll();
+  newCards.forEach(c => processQueue.push(c.id));
+  if (!isProcessing) runQueue();
+}
+
+async function runQueue() {
+  if (isProcessing || processQueue.length === 0) return;
+  isProcessing = true;
+  document.getElementById('scanLabel').style.display = 'flex';
+  document.getElementById('progressWrap').classList.add('visible');
+
+  while (processQueue.length > 0) {
+    const id = processQueue.shift();
+    const card = cards.find(c => c.id === id);
+    if (!card) continue;
+    card.status = 'processing';
+    renderRow(id);
+    updateStats();
+    try {
+      card.data = await extractData(card.file);
+      card.status = 'done';
+    } catch(err) {
+      card.status = 'error';
+      card.error = err.message;
+    }
+    renderRow(id);
+    updateStats();
+    updateProgress();
+  }
+
+  isProcessing = false;
+  document.getElementById('scanLabel').style.display = 'none';
+  document.getElementById('progressWrap').classList.remove('visible');
+  document.getElementById('progressBar').style.width = '0%';
+  const done = cards.filter(c => c.status === 'done').length;
+  const err = cards.filter(c => c.status === 'error').length;
+  toast(`Done! ${done} card${done !== 1 ? 's' : ''} extracted${err ? `, ${err} failed` : ''}.`, done > 0 ? 'success' : 'error');
+}
+
+function updateProgress() {
+  const total = cards.length;
+  const finished = cards.filter(c => c.status === 'done' || c.status === 'error').length;
+  const pct = total ? Math.round(finished / total * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+async function retryFailed() {
+  const failed = cards.filter(c => c.status === 'error');
+  if (!failed.length) return;
+  failed.forEach(c => { c.status = 'queued'; c.error = null; processQueue.push(c.id); renderRow(c.id); });
+  updateStats();
+  if (!isProcessing) runQueue();
+}
+
+// ─── AI EXTRACTION ───────────────────────────────────────────────────────────
+const OCR_PROMPT = `You are a precise OCR and data extraction engine for business cards. 
+Analyze this business card image and extract ALL visible contact information.
+Return ONLY a valid JSON object with these exact keys (no markdown, no code block, just raw JSON):
+{"name":"","title":"","company":"","email":"","phone":"","website":"","address":"","linkedin":"","notes":""}
+Rules:
+- name: full person name
+- title: job title/designation  
+- company: company or firm name
+- email: primary email address
+- phone: primary phone/mobile (include country code if visible)
+- website: website URL
+- address: full address on one line
+- linkedin: linkedin URL or handle
+- notes: any other info (fax, alternate phone, tagline, social handles)
+- Use "" for missing fields. Never invent data.`;
+
+async function extractData(file) {
+  const b64 = await toBase64(file);
+  const mt = file.type || 'image/jpeg';
+  const provider = activeTab;
+  const key = getActiveKey();
+  if (!key) throw new Error('No API key configured');
+
+  if (provider === 'claude') return extractClaude(key, b64, mt);
+  if (provider === 'gemini') return extractGemini(key, b64, mt);
+  if (provider === 'openai') return extractOpenAI(key, b64, mt);
+  throw new Error('Unknown provider');
+}
+
+async function extractClaude(key, b64, mt) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-haiku-3-5-20241022',
+      max_tokens: 800,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } },
+        { type: 'text', text: OCR_PROMPT }
+      ]}]
+    })
   });
-  var ew = document.getElementById('excelDiv');
-  ew.classList.toggle('on', cards.length>0);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'Claude API error ' + r.status); }
+  const d = await r.json();
+  return parseJSON(d.content.find(b => b.type === 'text')?.text || '{}');
 }
 
-function exportExcel(){
-  if(!cards.length){ toast('No cards to export','err'); return; }
-  var hdr = ['Sr No','Party Name','Owner Name','Designation','Mobile','Alt Number','Email','Website','Address','City','State','Pincode'];
-  var rows = [hdr];
-  cards.forEach(function(c,i){
-    rows.push([i+1, c.partyName, c.ownerName, c.designation,
-      c.phone, c.altPhone, c.email, c.website,
-      c.address, c.city, c.state, c.pincode]);
+async function extractGemini(key, b64, mt) {
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { inline_data: { mime_type: mt, data: b64 } },
+        { text: OCR_PROMPT }
+      ]}],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+    })
   });
-  var wb = XLSX.utils.book_new();
-  var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [5,26,22,20,15,15,26,22,38,14,14,10].map(function(w){ return {wch:w}; });
-  XLSX.utils.book_append_sheet(wb, ws, 'Visiting Cards');
-  XLSX.writeFile(wb, 'visiting_cards_'+new Date().toISOString().slice(0,10)+'.xlsx');
-  toast('Excel downloaded! ('+cards.length+' cards)','ok');
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'Gemini API error ' + r.status); }
+  const d = await r.json();
+  return parseJSON(d.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
 }
 
-// ─────────────────────────────────────────────
-// MISC
-// ─────────────────────────────────────────────
-function deleteCard(id){
-  cards = cards.filter(function(c){ return c.id!==id; });
-  var el = document.getElementById('card-'+id);
-  if(el){ el.style.opacity='0'; el.style.transform='scale(.97)'; el.style.transition='all .18s'; setTimeout(function(){el.remove();},200); }
-  updateView(); refreshTable();
+async function extractOpenAI(key, b64, mt) {
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 800,
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}`, detail: 'high' } },
+        { type: 'text', text: OCR_PROMPT }
+      ]}]
+    })
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'OpenAI API error ' + r.status); }
+  const d = await r.json();
+  return parseJSON(d.choices?.[0]?.message?.content || '{}');
 }
 
-function clearAll(){
-  if(!confirm('Clear everything?')) return;
-  cards=[]; imgs=[]; groups=[];
-  document.getElementById('cardList').innerHTML='';
-  document.getElementById('progPanel').classList.remove('on');
-  document.getElementById('excelDiv').classList.remove('on');
-  updateView();
-  toast('All cleared','ok');
-}
-
-function rescan(){
-  imgs.forEach(function(i){ i.status='pending'; i.name=''; i.phone=''; i.company=''; i.side=''; });
-  renderThumbs();
-  document.getElementById('progActions').style.display='none';
-  scanAllImages();
-}
-
-function updateView(){
-  var has = cards.length>0;
-  document.getElementById('cardsSection').style.display = has?'block':'none';
-  document.getElementById('emptyMsg').classList.toggle('on',!has);
-  document.getElementById('xlBtn').style.display = has?'flex':'none';
-  document.getElementById('clrBtn').style.display = has?'flex':'none';
-  var b = document.getElementById('cardBadge');
-  if(b) b.textContent = cards.length+' card'+(cards.length!==1?'s':'');
-}
-
-function toast(msg, type){
-  var t = document.getElementById('toastEl');
-  t.textContent = msg;
-  t.className = 'toast show'+(type==='ok'?' ok':type==='err'?' err':'');
-  clearTimeout(t._t);
-  t._t = setTimeout(function(){ t.classList.remove('show'); }, 3500);
-}
-
-// ─────────────────────────────────────────────
-// API KEY MANAGEMENT
-// ─────────────────────────────────────────────
-async function testKey(){
-  var k = document.getElementById('apiKey').value.trim();
-  if(!k){ toast('Paste your API key first','err'); return; }
-  var provider = getProvider();
-  toast('Testing key...', '');
-  try{
-    var testMsg = [{role:'user', content:[{type:'text', text:'Reply with just the word: OK'}]}];
-    var result = await callAPI(testMsg, 50);
-    if(result){ toast('✅ Key works! (' + provider + ')', 'ok'); }
-    else { toast('⚠️ Got empty response', 'err'); }
-  } catch(ex){
-    toast('❌ Key failed: ' + (ex.message||'unknown error'), 'err');
+function parseJSON(raw) {
+  try { return JSON.parse(raw.replace(/```json|```/g, '').trim()); }
+  catch(e) {
+    // Try to extract JSON object from text
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) { try { return JSON.parse(match[0]); } catch(e2) {} }
+    throw new Error('Could not parse AI response as JSON');
   }
 }
 
-function saveKey(){
-  var k = document.getElementById('apiKey').value.trim();
-  if(!k){ toast('Please paste your API key first','err'); return; }
-
-  try{ localStorage.setItem('vc_k', k); }catch(e){}
-  var badge = document.getElementById('keySavedBadge');
-  var wrap = document.getElementById('keyWrap');
-  badge.classList.add('on');
-  wrap.classList.add('saved');
-  toast('API key saved! ✅','ok');
-  setTimeout(function(){ badge.classList.remove('on'); wrap.classList.remove('saved'); }, 3000);
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('File read failed'));
+    r.readAsDataURL(file);
+  });
 }
 
-function toggleKeyVisibility(){
-  var inp = document.getElementById('apiKey');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function statusBadge(card) {
+  const cfgs = {
+    queued:     ['#2a2a3a','#8888aa','⋯ Queued'],
+    processing: ['#1a2a1a','#44cc44','◉ Scanning'],
+    done:       ['#1a2a2a','#44ddcc','✓ Extracted'],
+    error:      ['#2a1a1a','#ee4444','✗ Failed'],
+  };
+  const [bg, col, label] = cfgs[card.status] || ['#111','#888','—'];
+  const anim = card.status === 'processing' ? 'animation:pulse 1s ease infinite' : '';
+  return `<span class="status-badge" style="background:${bg};color:${col};border:1px solid ${col}33;${anim}">${label}</span>`;
 }
 
-// Init
-updateView();
-try{
-  var k = localStorage.getItem('vc_k');
-  var p = localStorage.getItem('vc_p');
-  if(k){
-    document.getElementById('apiKey').value = k;
-    var badge = document.getElementById('keySavedBadge');
-    badge.classList.add('on');
-    setTimeout(function(){ badge.classList.remove('on'); }, 2000);
+function renderRow(id) {
+  const card = cards.find(c => c.id === id);
+  if (!card) return;
+  let el = document.getElementById('row-' + id);
+  const isNew = !el;
+  if (isNew) {
+    el = document.createElement('div');
+    el.id = 'row-' + id;
+    el.className = 'card-row';
+    document.getElementById('cardList').appendChild(el);
   }
-  if(p){ document.getElementById('apiProvider').value = p; }
-}catch(e){}
+
+  const name = card.status === 'done'
+    ? (card.data?.name || '<span style="opacity:.4">—</span>')
+    : `<span style="font-size:11px;color:var(--text3)">${card.file.name}</span>`;
+  const company = card.data?.company || '';
+  const phone = card.data?.phone || '';
+
+  const expandFields = FIELDS.filter(f => card.data?.[f]).map(f => `
+    <div class="expand-field" style="${f==='address'||f==='notes'?'grid-column:span 2':''}">
+      <div class="expand-field-label">${ICONS[f]} ${LABELS[f]}</div>
+      <div class="expand-field-val">${escHtml(card.data[f])}</div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="card-summary" onclick="toggleRow('${id}')">
+      <img class="card-thumb" src="${card.preview}" alt="" onerror="this.style.display='none'">
+      <div class="card-name">${name}</div>
+      <div class="card-sub">${escHtml(company)}</div>
+      <div class="card-sub">${escHtml(phone)}</div>
+      ${statusBadge(card)}
+      <div class="row-actions" onclick="event.stopPropagation()">
+        ${card.status === 'done' ? `<button class="btn btn-ghost btn-sm" onclick="openEdit('${id}')">Edit</button>` : ''}
+        ${card.status === 'error' ? `<button class="btn btn-ghost btn-sm" onclick="retrySingle('${id}')">Retry</button>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="removeCard('${id}')">✕</button>
+      </div>
+    </div>
+    ${card.status === 'done' && expandFields ? `
+      <div class="card-expand" id="expand-${id}">
+        <div class="expand-grid">${expandFields}</div>
+        ${card.error ? `<div style="margin-top:8px;font-size:11px;color:var(--red)">⚠ ${escHtml(card.error)}</div>` : ''}
+      </div>` : ''}
+    ${card.status === 'error' ? `
+      <div class="card-expand" id="expand-${id}">
+        <div style="font-size:12px;color:var(--red)">✗ ${escHtml(card.error || 'Extraction failed')}</div>
+      </div>` : ''}
+  `;
+}
+
+function toggleRow(id) {
+  const el = document.getElementById('expand-' + id);
+  if (el) el.classList.toggle('open');
+}
+
+function renderAll() {
+  document.getElementById('cardList').innerHTML = '';
+  const q = document.getElementById('searchInput')?.value?.toLowerCase() || '';
+  const f = document.getElementById('filterStatus')?.value || 'all';
+  const visible = cards.filter(c => {
+    if (f !== 'all' && c.status !== f) return false;
+    if (!q) return true;
+    return ['name','company','email','phone','title'].some(k => (c.data?.[k] || '').toLowerCase().includes(q));
+  });
+  visible.forEach(c => renderRow(c.id));
+  updateStats();
+}
+
+function renderTable() { renderAll(); }
+
+function updateStats() {
+  const total = cards.length;
+  const done = cards.filter(c => c.status === 'done').length;
+  const proc = cards.filter(c => c.status === 'processing').length;
+  const err = cards.filter(c => c.status === 'error').length;
+  const queued = cards.filter(c => c.status === 'queued').length;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statDone').textContent = done;
+  document.getElementById('statProc').textContent = proc;
+  document.getElementById('statErr').textContent = err;
+  document.getElementById('statQueued').textContent = queued;
+
+  const show = total > 0;
+  document.getElementById('statsBar').style.display = show ? 'flex' : 'none';
+  document.getElementById('tableWrap').style.display = show ? 'block' : 'none';
+  document.getElementById('emptyState').classList.toggle('visible', !show);
+  document.getElementById('clearBtn').style.display = show ? 'inline-flex' : 'none';
+  document.getElementById('filterBar').classList.toggle('visible', show);
+  document.getElementById('retryBtn').style.display = err > 0 ? 'inline-flex' : 'none';
+
+  const expBtn = document.getElementById('exportBtn');
+  const exportLabel = document.getElementById('exportLabel');
+  if (done > 0) {
+    expBtn.disabled = false;
+    exportLabel.textContent = `Export to Excel (${done})`;
+  } else {
+    expBtn.disabled = true;
+    exportLabel.textContent = 'Export to Excel';
+  }
+}
+
+// ─── CARD ACTIONS ────────────────────────────────────────────────────────────
+function removeCard(id) {
+  const card = cards.find(c => c.id === id);
+  if (card?.preview) URL.revokeObjectURL(card.preview);
+  cards = cards.filter(c => c.id !== id);
+  processQueue = processQueue.filter(i => i !== id);
+  const el = document.getElementById('row-' + id);
+  if (el) el.remove();
+  updateStats();
+}
+
+function retrySingle(id) {
+  const card = cards.find(c => c.id === id);
+  if (!card) return;
+  card.status = 'queued'; card.error = null;
+  processQueue.push(id);
+  renderRow(id);
+  updateStats();
+  if (!isProcessing) runQueue();
+}
+
+function clearAll() {
+  if (!confirm('Remove all scanned cards?')) return;
+  cards.forEach(c => c.preview && URL.revokeObjectURL(c.preview));
+  cards = []; processQueue = [];
+  document.getElementById('cardList').innerHTML = '';
+  updateStats();
+  toast('All cards cleared.', 'info');
+}
+
+// ─── EDIT MODAL ───────────────────────────────────────────────────────────────
+function openEdit(id) {
+  editingId = id;
+  const card = cards.find(c => c.id === id);
+  const container = document.getElementById('editFields');
+  container.innerHTML = FIELDS.map(f => `
+    <div class="form-group ${['address','notes'].includes(f) ? 'edit-field-full' : ''}">
+      <label class="form-label">${ICONS[f]} ${LABELS[f]}</label>
+      <input class="form-input" id="ef-${f}" value="${escAttr(card.data?.[f] || '')}" placeholder="—">
+    </div>`).join('');
+  document.getElementById('editModal').classList.add('open');
+}
+
+function saveEdit() {
+  const card = cards.find(c => c.id === editingId);
+  if (!card) return;
+  card.data = Object.fromEntries(FIELDS.map(f => [f, document.getElementById('ef-' + f)?.value || '']));
+  renderRow(editingId);
+  closeModal();
+  toast('Card data saved.', 'success');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('editModal'))
+    document.getElementById('editModal').classList.remove('open');
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function exportExcel() {
+  const done = cards.filter(c => c.status === 'done');
+  if (!done.length) { toast('No extracted cards to export.', 'error'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // Main data sheet
+  const headers = FIELDS.map(f => LABELS[f]);
+  const rows = done.map(c => FIELDS.map(f => c.data?.[f] || ''));
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  // Column widths
+  ws['!cols'] = FIELDS.map(f => ({ wch: Math.max(LABELS[f].length + 6, 24) }));
+
+  // Freeze header row
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Business Cards');
+
+  // Summary sheet
+  const summaryData = [
+    ['CardScan Pro — Export Summary'],
+    ['Export Date', new Date().toLocaleString()],
+    ['Total Cards Scanned', cards.length],
+    ['Successfully Extracted', done.length],
+    ['Failed', cards.filter(c => c.status === 'error').length],
+    ['API Provider Used', activeTab.toUpperCase()],
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws2['!cols'] = [{ wch: 30 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  const date = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `business_cards_${date}.xlsx`);
+  toast(`✓ Exported ${done.length} cards to Excel!`, 'success');
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const icons = { success: '✓', error: '✗', info: 'ℹ' };
+  const colors = { success: 'var(--green)', error: 'var(--red)', info: 'var(--accent)' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span style="color:${colors[type]};font-size:15px">${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(20px)'; el.style.transition = 'all .3s'; setTimeout(() => el.remove(), 300); }, 3200);
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return String(s || '').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>
