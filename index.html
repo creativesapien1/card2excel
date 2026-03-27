@@ -609,61 +609,37 @@ function updateNoApiWarning() {
 }
 
 // ─── GEMINI MODEL DISCOVERY ───────────────────────────────────────────────────
-// Fetches the real list of models available on the user's key, picks a vision one
 async function discoverGeminiModel(key) {
-  // First try listing available models
+  // 1. Try listing available models (no quota cost, just metadata)
   try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
     if (r.ok) {
       const d = await r.json();
       const available = (d.models || []).map(m => m.name.replace('models/', ''));
-      // Prefer in this order — all support vision/generateContent
       const preferred = [
+        'gemini-2.0-flash-lite',  // highest free RPM
         'gemini-2.0-flash',
-        'gemini-2.0-flash-lite',
-        'gemini-1.5-flash',
         'gemini-1.5-flash-8b',
+        'gemini-1.5-flash',
         'gemini-1.5-pro',
-        'gemini-pro-vision',
       ];
       for (const p of preferred) {
-        if (available.some(a => a === p || a.startsWith(p))) {
-          const match = available.find(a => a === p || a.startsWith(p));
+        const match = available.find(a => a === p || a.startsWith(p + '-'));
+        if (match) {
+          localStorage.setItem('cardscan_gemini_model', match);
           return match;
         }
       }
-      // Fallback: pick any gemini model that supports generateContent
-      const fallback = available.find(a => a.includes('gemini') && !a.includes('embedding') && !a.includes('aqa'));
-      if (fallback) return fallback;
+      // Any gemini model that's not an embedding
+      const fallback = available.find(a => a.includes('gemini') && !a.includes('embed') && !a.includes('aqa'));
+      if (fallback) { localStorage.setItem('cardscan_gemini_model', fallback); return fallback; }
     }
-  } catch(e) { /* ignore, fall through to hardcoded list */ }
+  } catch(e) { /* fall through */ }
 
-  // Last resort: try a hardcoded list one by one
-  const hardcoded = [
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
-    'gemini-1.5-pro',
-  ];
-  for (const model of hardcoded) {
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
-      });
-      if (r.ok) return model;
-      const e = await r.json().catch(()=>({}));
-      // 404 = model not found, keep trying. Other errors = key issue
-      if (r.status !== 404 && r.status !== 400) {
-        throw new Error(e.error?.message || 'HTTP ' + r.status);
-      }
-    } catch(ex) {
-      if (ex.message && !ex.message.includes('not found') && !ex.message.includes('404')) throw ex;
-    }
-  }
-  throw new Error('No supported Gemini vision model found for this API key. Check your Google AI Studio project region/access.');
+  // 2. Fallback: return best-guess without a test call (save quota)
+  const guess = 'gemini-2.0-flash-lite';
+  localStorage.setItem('cardscan_gemini_model', guess);
+  return guess;
 }
 
 // ─── TEST API ─────────────────────────────────────────────────────────────────
@@ -696,10 +672,10 @@ async function testApi(provider) {
       saveKeys();
 
     } else if (provider === 'gemini') {
-      showTestStatus(provider, 'info', 'Discovering available Gemini models…');
+      showTestStatus(provider, 'info', 'Querying your available Gemini models…');
+      // discoverGeminiModel uses /models list (no generateContent call = no quota used)
       const model = await discoverGeminiModel(key);
-      localStorage.setItem('cardscan_gemini_model', model);
-      showTestStatus(provider, 'success', `✓ Key valid — using model: ${model}`);
+      showTestStatus(provider, 'success', `✓ Key valid — will use model: ${model} (auto-selected, free tier)`);
       saveKeys();
 
     } else if (provider === 'openai') {
@@ -807,24 +783,10 @@ async function runQueue() {
   document.getElementById('scanLabel').style.display = 'flex';
   document.getElementById('progressWrap').classList.add('visible');
 
-  // Gemini free tier: 15 req/min = 1 req per 4s minimum
-  // We use 4.5s gap to stay safely under the limit
-  const INTER_CARD_DELAY = activeTab === 'gemini' ? 4500 : 500;
-  let cardIndex = 0;
-
   while (processQueue.length > 0) {
     const id = processQueue.shift();
     const card = cards.find(c => c.id === id);
     if (!card) continue;
-
-    // Pacing delay between cards (skip for first card)
-    if (cardIndex > 0 && activeTab === 'gemini') {
-      const waitSec = Math.round(INTER_CARD_DELAY / 1000);
-      updateScanLabel(`Pacing requests — next card in ${waitSec}s (Gemini: 15 req/min limit)`);
-      await sleep(INTER_CARD_DELAY);
-      updateScanLabel('AI scanning…');
-    }
-    cardIndex++;
 
     card.status = 'processing';
     renderRow(id);
@@ -847,7 +809,7 @@ async function runQueue() {
   document.getElementById('progressWrap').classList.remove('visible');
   document.getElementById('progressBar').style.width = '0%';
   const done = cards.filter(c => c.status === 'done').length;
-  const err = cards.filter(c => c.status === 'error').length;
+  const err  = cards.filter(c => c.status === 'error').length;
   toast(`Done! ${done} card${done !== 1 ? 's' : ''} extracted${err ? `, ${err} failed` : ''}.`, done > 0 ? 'success' : 'error');
 }
 
@@ -857,9 +819,9 @@ function updateScanLabel(msg) {
 }
 
 function updateProgress() {
-  const total = cards.length;
+  const total    = cards.length;
   const finished = cards.filter(c => c.status === 'done' || c.status === 'error').length;
-  const pct = total ? Math.round(finished / total * 100) : 0;
+  const pct      = total ? Math.round(finished / total * 100) : 0;
   document.getElementById('progressBar').style.width = pct + '%';
 }
 
@@ -888,16 +850,94 @@ Rules:
 - notes: any other info (fax, alternate phone, tagline, social handles)
 - Use "" for missing fields. Never invent data.`;
 
+// ─── GLOBAL GEMINI RATE LIMITER ──────────────────────────────────────────────
+// Gemini free tier: 10 RPM for 2.0-flash, 15 RPM for 1.5-flash
+// We enforce a strict minimum 7s between ANY Gemini API call (≈8 RPM max)
+// This is shared across discover + extract so nothing ever bursts.
+const GeminiRateLimiter = (() => {
+  let lastCallTime = 0;
+  const MIN_GAP_MS = 7000; // 7 seconds = max ~8 req/min, safely under 10 RPM
+
+  return {
+    async wait() {
+      const now = Date.now();
+      const elapsed = now - lastCallTime;
+      const remaining = MIN_GAP_MS - elapsed;
+      if (remaining > 0 && lastCallTime > 0) {
+        // Show countdown
+        const totalSec = Math.ceil(remaining / 1000);
+        for (let s = totalSec; s > 0; s--) {
+          updateRateLimitBanner(true, `Rate pacing — next request in ${s}s to stay within Gemini free limits`);
+          await sleep(Math.min(1000, remaining - (totalSec - s) * 1000));
+        }
+        updateRateLimitBanner(false);
+      }
+      lastCallTime = Date.now();
+    },
+    reset() { lastCallTime = 0; }
+  };
+})();
+
+async function geminiCall(key, body) {
+  let model = localStorage.getItem('cardscan_gemini_model') || 'gemini-2.0-flash-lite';
+
+  // Wait for rate limiter before every single call
+  await GeminiRateLimiter.wait();
+
+  const doFetch = (m) => fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+
+  let r = await doFetch(model);
+
+  // Model not available — try fallback list once (each needs its own rate-limited slot)
+  if (r.status === 404 || r.status === 400) {
+    const fallbacks = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-flash'];
+    const others = fallbacks.filter(m2 => m2 !== model);
+    for (const m2 of others) {
+      await GeminiRateLimiter.wait();
+      r = await doFetch(m2);
+      if (r.ok || r.status === 429) {
+        if (r.ok) { localStorage.setItem('cardscan_gemini_model', m2); model = m2; }
+        break;
+      }
+    }
+  }
+
+  // Still rate limited after pacing? Wait exactly 60s (full window reset) then retry once
+  if (r.status === 429) {
+    const retryAfterRaw = r.headers.get('Retry-After');
+    const waitMs = retryAfterRaw ? parseInt(retryAfterRaw, 10) * 1000 : 62000;
+    const waitSec = Math.ceil(waitMs / 1000);
+    // Countdown display
+    for (let s = waitSec; s > 0; s--) {
+      updateRateLimitBanner(true, `Still rate limited — waiting ${s}s for Gemini quota window to reset…`);
+      await sleep(1000);
+    }
+    updateRateLimitBanner(false);
+    GeminiRateLimiter.reset();
+    await GeminiRateLimiter.wait();
+    r = await doFetch(model);
+  }
+
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error?.message || `Gemini HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
 async function extractData(file) {
   const b64 = await toBase64(file);
-  const mt = file.type || 'image/jpeg';
+  const mt  = file.type || 'image/jpeg';
   const provider = activeTab;
   const key = getActiveKey();
   if (!key) throw new Error('No API key configured');
 
-  if (provider === 'claude') return extractClaude(key, b64, mt);
-  if (provider === 'gemini') return extractGemini(key, b64, mt);
-  if (provider === 'openai') return extractOpenAI(key, b64, mt);
+  if (provider === 'claude')  return extractClaude(key, b64, mt);
+  if (provider === 'gemini')  return extractGemini(key, b64, mt);
+  if (provider === 'openai')  return extractOpenAI(key, b64, mt);
   throw new Error('Unknown provider');
 }
 
@@ -922,7 +962,7 @@ async function extractClaude(key, b64, mt) {
       })
     });
     if (r.status === 429 && attempt < MAX_RETRIES) {
-      const wait = 5000 * (attempt + 1);
+      const wait = 8000 * (attempt + 1);
       updateRateLimitBanner(true, `Claude rate limited — retrying in ${Math.round(wait/1000)}s…`);
       await sleep(wait);
       updateRateLimitBanner(false);
@@ -935,70 +975,14 @@ async function extractClaude(key, b64, mt) {
 }
 
 async function extractGemini(key, b64, mt) {
-  // Use the saved model from test, or discover dynamically
-  let model = localStorage.getItem('cardscan_gemini_model');
-  if (!model) {
-    model = await discoverGeminiModel(key);
-    localStorage.setItem('cardscan_gemini_model', model);
-  }
-
-  const buildBody = () => JSON.stringify({
+  const d = await geminiCall(key, {
     contents: [{ parts: [
       { inline_data: { mime_type: mt, data: b64 } },
       { text: OCR_PROMPT }
     ]}],
     generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
   });
-
-  const makeRequest = (m) => fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: buildBody() }
-  );
-
-  // Retry config: up to 5 attempts with exponential backoff for 429
-  const MAX_RETRIES = 5;
-  const BASE_DELAY_MS = 8000; // 8s base — Gemini free tier resets per minute
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    let r = await makeRequest(model);
-
-    // Model not found — rediscover once
-    if (!r.ok && (r.status === 404 || r.status === 400) && attempt === 0) {
-      localStorage.removeItem('cardscan_gemini_model');
-      model = await discoverGeminiModel(key);
-      localStorage.setItem('cardscan_gemini_model', model);
-      r = await makeRequest(model);
-    }
-
-    // Rate limited — wait and retry
-    if (r.status === 429) {
-      if (attempt >= MAX_RETRIES) {
-        throw new Error('Rate limit exceeded after ' + MAX_RETRIES + ' retries. Gemini free tier allows 15 req/min. Wait a minute and try again.');
-      }
-      // Respect Retry-After header if present, else exponential backoff
-      const retryAfter = parseInt(r.headers.get('Retry-After') || '0', 10);
-      const waitMs = retryAfter > 0
-        ? retryAfter * 1000
-        : BASE_DELAY_MS * Math.pow(1.8, attempt); // 8s, 14s, 26s, 46s, 83s
-
-      const waitSec = Math.round(waitMs / 1000);
-      updateRateLimitBanner(true, `Rate limited — retrying in ${waitSec}s (attempt ${attempt + 1}/${MAX_RETRIES})…`);
-      await sleep(waitMs);
-      updateRateLimitBanner(false);
-      continue; // retry the loop
-    }
-
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      const msg = e.error?.message || 'Gemini HTTP ' + r.status;
-      throw new Error(msg);
-    }
-
-    const d = await r.json();
-    return parseJSON(d.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
-  }
-
-  throw new Error('Gemini extraction failed after all retries.');
+  return parseJSON(d.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1009,13 +993,14 @@ function updateRateLimitBanner(show, msg = '') {
     el = document.createElement('div');
     el.id = 'rateLimitBanner';
     el.style.cssText = [
-      'position:fixed', 'bottom:70px', 'left:50%', 'transform:translateX(-50%)',
+      'position:fixed', 'bottom:24px', 'left:50%', 'transform:translateX(-50%)',
       'background:#1a1400', 'border:1px solid #aa8800', 'border-radius:8px',
-      'padding:10px 20px', 'font-size:13px', 'color:#ddaa44',
-      'font-family:var(--mono)', 'z-index:500', 'display:none',
+      'padding:10px 20px', 'font-size:12px', 'color:#ddaa44',
+      'font-family:var(--mono)', 'z-index:500',
       'white-space:nowrap', 'box-shadow:0 4px 24px rgba(0,0,0,.6)',
       'display:flex', 'align-items:center', 'gap:10px'
     ].join(';');
+    el.style.display = 'none';
     document.body.appendChild(el);
   }
   if (show) {
@@ -1042,7 +1027,7 @@ async function extractOpenAI(key, b64, mt) {
       })
     });
     if (r.status === 429 && attempt < MAX_RETRIES) {
-      const wait = 5000 * (attempt + 1);
+      const wait = 8000 * (attempt + 1);
       updateRateLimitBanner(true, `OpenAI rate limited — retrying in ${Math.round(wait/1000)}s…`);
       await sleep(wait);
       updateRateLimitBanner(false);
