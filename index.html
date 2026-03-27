@@ -807,10 +807,25 @@ async function runQueue() {
   document.getElementById('scanLabel').style.display = 'flex';
   document.getElementById('progressWrap').classList.add('visible');
 
+  // Gemini free tier: 15 req/min = 1 req per 4s minimum
+  // We use 4.5s gap to stay safely under the limit
+  const INTER_CARD_DELAY = activeTab === 'gemini' ? 4500 : 500;
+  let cardIndex = 0;
+
   while (processQueue.length > 0) {
     const id = processQueue.shift();
     const card = cards.find(c => c.id === id);
     if (!card) continue;
+
+    // Pacing delay between cards (skip for first card)
+    if (cardIndex > 0 && activeTab === 'gemini') {
+      const waitSec = Math.round(INTER_CARD_DELAY / 1000);
+      updateScanLabel(`Pacing requests — next card in ${waitSec}s (Gemini: 15 req/min limit)`);
+      await sleep(INTER_CARD_DELAY);
+      updateScanLabel('AI scanning…');
+    }
+    cardIndex++;
+
     card.status = 'processing';
     renderRow(id);
     updateStats();
@@ -827,12 +842,18 @@ async function runQueue() {
   }
 
   isProcessing = false;
+  updateRateLimitBanner(false);
   document.getElementById('scanLabel').style.display = 'none';
   document.getElementById('progressWrap').classList.remove('visible');
   document.getElementById('progressBar').style.width = '0%';
   const done = cards.filter(c => c.status === 'done').length;
   const err = cards.filter(c => c.status === 'error').length;
   toast(`Done! ${done} card${done !== 1 ? 's' : ''} extracted${err ? `, ${err} failed` : ''}.`, done > 0 ? 'success' : 'error');
+}
+
+function updateScanLabel(msg) {
+  const el = document.getElementById('scanLabel');
+  if (el) el.innerHTML = `<span class="spin">⟳</span> ${msg}`;
 }
 
 function updateProgress() {
@@ -881,26 +902,36 @@ async function extractData(file) {
 }
 
 async function extractClaude(key, b64, mt) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-3-5-20241022',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } },
-        { type: 'text', text: OCR_PROMPT }
-      ]}]
-    })
-  });
-  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'Claude API error ' + r.status); }
-  const d = await r.json();
-  return parseJSON(d.content.find(b => b.type === 'text')?.text || '{}');
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-3-5-20241022',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } },
+          { type: 'text', text: OCR_PROMPT }
+        ]}]
+      })
+    });
+    if (r.status === 429 && attempt < MAX_RETRIES) {
+      const wait = 5000 * (attempt + 1);
+      updateRateLimitBanner(true, `Claude rate limited — retrying in ${Math.round(wait/1000)}s…`);
+      await sleep(wait);
+      updateRateLimitBanner(false);
+      continue;
+    }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'Claude API error ' + r.status); }
+    const d = await r.json();
+    return parseJSON(d.content.find(b => b.type === 'text')?.text || '{}');
+  }
 }
 
 async function extractGemini(key, b64, mt) {
@@ -911,55 +942,116 @@ async function extractGemini(key, b64, mt) {
     localStorage.setItem('cardscan_gemini_model', model);
   }
 
-  const makeRequest = async (m) => fetch(
+  const buildBody = () => JSON.stringify({
+    contents: [{ parts: [
+      { inline_data: { mime_type: mt, data: b64 } },
+      { text: OCR_PROMPT }
+    ]}],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+  });
+
+  const makeRequest = (m) => fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { inline_data: { mime_type: mt, data: b64 } },
-          { text: OCR_PROMPT }
-        ]}],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
-      })
-    }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: buildBody() }
   );
 
-  let r = await makeRequest(model);
+  // Retry config: up to 5 attempts with exponential backoff for 429
+  const MAX_RETRIES = 5;
+  const BASE_DELAY_MS = 8000; // 8s base — Gemini free tier resets per minute
 
-  // If saved model fails (404/400), rediscover and retry once
-  if (!r.ok && (r.status === 404 || r.status === 400)) {
-    localStorage.removeItem('cardscan_gemini_model');
-    model = await discoverGeminiModel(key);
-    localStorage.setItem('cardscan_gemini_model', model);
-    r = await makeRequest(model);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let r = await makeRequest(model);
+
+    // Model not found — rediscover once
+    if (!r.ok && (r.status === 404 || r.status === 400) && attempt === 0) {
+      localStorage.removeItem('cardscan_gemini_model');
+      model = await discoverGeminiModel(key);
+      localStorage.setItem('cardscan_gemini_model', model);
+      r = await makeRequest(model);
+    }
+
+    // Rate limited — wait and retry
+    if (r.status === 429) {
+      if (attempt >= MAX_RETRIES) {
+        throw new Error('Rate limit exceeded after ' + MAX_RETRIES + ' retries. Gemini free tier allows 15 req/min. Wait a minute and try again.');
+      }
+      // Respect Retry-After header if present, else exponential backoff
+      const retryAfter = parseInt(r.headers.get('Retry-After') || '0', 10);
+      const waitMs = retryAfter > 0
+        ? retryAfter * 1000
+        : BASE_DELAY_MS * Math.pow(1.8, attempt); // 8s, 14s, 26s, 46s, 83s
+
+      const waitSec = Math.round(waitMs / 1000);
+      updateRateLimitBanner(true, `Rate limited — retrying in ${waitSec}s (attempt ${attempt + 1}/${MAX_RETRIES})…`);
+      await sleep(waitMs);
+      updateRateLimitBanner(false);
+      continue; // retry the loop
+    }
+
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      const msg = e.error?.message || 'Gemini HTTP ' + r.status;
+      throw new Error(msg);
+    }
+
+    const d = await r.json();
+    return parseJSON(d.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
   }
 
-  if (!r.ok) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.error?.message || 'Gemini HTTP ' + r.status);
+  throw new Error('Gemini extraction failed after all retries.');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function updateRateLimitBanner(show, msg = '') {
+  let el = document.getElementById('rateLimitBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'rateLimitBanner';
+    el.style.cssText = [
+      'position:fixed', 'bottom:70px', 'left:50%', 'transform:translateX(-50%)',
+      'background:#1a1400', 'border:1px solid #aa8800', 'border-radius:8px',
+      'padding:10px 20px', 'font-size:13px', 'color:#ddaa44',
+      'font-family:var(--mono)', 'z-index:500', 'display:none',
+      'white-space:nowrap', 'box-shadow:0 4px 24px rgba(0,0,0,.6)',
+      'display:flex', 'align-items:center', 'gap:10px'
+    ].join(';');
+    document.body.appendChild(el);
   }
-  const d = await r.json();
-  return parseJSON(d.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
+  if (show) {
+    el.innerHTML = `<span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> ${msg}`;
+    el.style.display = 'flex';
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 async function extractOpenAI(key, b64, mt) {
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: [
-        { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}`, detail: 'high' } },
-        { type: 'text', text: OCR_PROMPT }
-      ]}]
-    })
-  });
-  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'OpenAI API error ' + r.status); }
-  const d = await r.json();
-  return parseJSON(d.choices?.[0]?.message?.content || '{}');
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}`, detail: 'high' } },
+          { type: 'text', text: OCR_PROMPT }
+        ]}]
+      })
+    });
+    if (r.status === 429 && attempt < MAX_RETRIES) {
+      const wait = 5000 * (attempt + 1);
+      updateRateLimitBanner(true, `OpenAI rate limited — retrying in ${Math.round(wait/1000)}s…`);
+      await sleep(wait);
+      updateRateLimitBanner(false);
+      continue;
+    }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'OpenAI API error ' + r.status); }
+    const d = await r.json();
+    return parseJSON(d.choices?.[0]?.message?.content || '{}');
+  }
 }
 
 function parseJSON(raw) {
