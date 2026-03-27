@@ -398,7 +398,7 @@
       </div>
       <div class="api-info">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div>Get your <strong style="color:var(--green)">100% free</strong> API key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> — Free with generous limits (15 req/min, 1500/day). <strong style="color:var(--text2)">Recommended for zero cost.</strong> The app auto-detects the best available Gemini model (2.0-flash → 1.5-flash). Use "Test Key" first — it finds &amp; saves the working model for your account. Keys stored in browser only.</div>
+        <div>Get your <strong style="color:var(--green)">100% free</strong> API key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> — Free with generous limits (15 req/min, 1500/day). <strong style="color:var(--text2)">Recommended for zero cost.</strong> Click <strong style="color:var(--text2)">Test Key</strong> — the app will automatically discover and save the best vision model available on your account (queries your actual model list, no guessing).</div>
       </div>
     </div>
 
@@ -413,7 +413,7 @@
       </div>
       <div class="api-info">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div>Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a> — New accounts get $5 free credits. Model: <strong style="color:var(--text2)">gpt-4o-mini</strong> (very cost-effective for vision tasks). Keys stored in browser only.</div>
+        <div>Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> — Model used: <strong style="color:var(--text2)">gpt-4o-mini</strong>. <strong style="color:var(--amber)">Important:</strong> OpenAI no longer gives free credits to new accounts — you must add a payment method and load at least $5 at <a href="https://platform.openai.com/settings/billing" target="_blank">platform.openai.com/settings/billing</a>. If test shows "quota exceeded", your key is valid but needs billing setup. Use Gemini instead for truly free usage.</div>
       </div>
     </div>
   </div>
@@ -608,6 +608,64 @@ function updateNoApiWarning() {
   warn.style.display = key ? 'none' : 'flex';
 }
 
+// ─── GEMINI MODEL DISCOVERY ───────────────────────────────────────────────────
+// Fetches the real list of models available on the user's key, picks a vision one
+async function discoverGeminiModel(key) {
+  // First try listing available models
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if (r.ok) {
+      const d = await r.json();
+      const available = (d.models || []).map(m => m.name.replace('models/', ''));
+      // Prefer in this order — all support vision/generateContent
+      const preferred = [
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-8b',
+        'gemini-1.5-pro',
+        'gemini-pro-vision',
+      ];
+      for (const p of preferred) {
+        if (available.some(a => a === p || a.startsWith(p))) {
+          const match = available.find(a => a === p || a.startsWith(p));
+          return match;
+        }
+      }
+      // Fallback: pick any gemini model that supports generateContent
+      const fallback = available.find(a => a.includes('gemini') && !a.includes('embedding') && !a.includes('aqa'));
+      if (fallback) return fallback;
+    }
+  } catch(e) { /* ignore, fall through to hardcoded list */ }
+
+  // Last resort: try a hardcoded list one by one
+  const hardcoded = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+  ];
+  for (const model of hardcoded) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
+      });
+      if (r.ok) return model;
+      const e = await r.json().catch(()=>({}));
+      // 404 = model not found, keep trying. Other errors = key issue
+      if (r.status !== 404 && r.status !== 400) {
+        throw new Error(e.error?.message || 'HTTP ' + r.status);
+      }
+    } catch(ex) {
+      if (ex.message && !ex.message.includes('not found') && !ex.message.includes('404')) throw ex;
+    }
+  }
+  throw new Error('No supported Gemini vision model found for this API key. Check your Google AI Studio project region/access.');
+}
+
 // ─── TEST API ─────────────────────────────────────────────────────────────────
 async function testApi(provider) {
   const keyEl = document.getElementById(provider + 'Key');
@@ -616,12 +674,10 @@ async function testApi(provider) {
 
   const btn = document.querySelector(`#content-${provider} .btn-primary`);
   if (btn) { btn.textContent = 'Testing…'; btn.disabled = true; }
-  toast('Testing connection…', 'info');
+  showTestStatus(provider, 'info', 'Connecting to API…');
 
   try {
-    let errMsg = '';
     if (provider === 'claude') {
-      // Claude requires this header for browser-side calls
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -632,29 +688,19 @@ async function testApi(provider) {
         },
         body: JSON.stringify({ model: 'claude-haiku-3-5-20241022', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
       });
-      if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
+      if (!r.ok) {
+        const e = await r.json().catch(()=>({}));
+        throw new Error(e.error?.message || 'HTTP ' + r.status);
+      }
+      showTestStatus(provider, 'success', '✓ Claude key valid — claude-haiku-3-5 ready');
+      saveKeys();
 
     } else if (provider === 'gemini') {
-      // Try gemini-2.0-flash first, fall back to gemini-1.5-flash
-      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
-      let success = false;
-      for (const model of models) {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: 'Hi' }] }] })
-        });
-        if (r.ok) {
-          // Save which model works
-          localStorage.setItem('cardscan_gemini_model', model);
-          success = true;
-          break;
-        } else {
-          const e = await r.json().catch(()=>({}));
-          errMsg = e.error?.message || 'HTTP ' + r.status;
-        }
-      }
-      if (!success) throw new Error(errMsg || 'All Gemini models failed');
+      showTestStatus(provider, 'info', 'Discovering available Gemini models…');
+      const model = await discoverGeminiModel(key);
+      localStorage.setItem('cardscan_gemini_model', model);
+      showTestStatus(provider, 'success', `✓ Key valid — using model: ${model}`);
+      saveKeys();
 
     } else if (provider === 'openai') {
       const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -662,19 +708,55 @@ async function testApi(provider) {
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
         body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
       });
-      if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
+      if (!r.ok) {
+        const e = await r.json().catch(()=>({}));
+        const msg = e.error?.message || '';
+        const code = e.error?.code || '';
+        if (code === 'insufficient_quota' || msg.includes('quota') || msg.includes('billing')) {
+          showTestStatus(provider, 'warn',
+            '⚠ Key is valid but has no billing credits. Add a payment method at platform.openai.com/settings/billing — new keys need at least $5 loaded to use GPT-4o-mini vision.');
+        } else if (r.status === 401) {
+          showTestStatus(provider, 'error', '✗ Invalid API key — check you copied the full key starting with sk-');
+        } else {
+          showTestStatus(provider, 'error', '✗ ' + (msg || 'HTTP ' + r.status));
+        }
+        return;
+      }
+      showTestStatus(provider, 'success', '✓ OpenAI key valid — gpt-4o-mini ready');
+      saveKeys();
     }
-    toast('✓ API key is valid and working!', 'success');
-    saveKeys();
+
   } catch(e) {
-    let msg = e.message;
-    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
-      msg = 'CORS/Network error — try opening as a local file or check your key';
+    let msg = e.message || 'Unknown error';
+    if (msg.includes('Failed to fetch') || msg.includes('Load failed') || msg.includes('NetworkError')) {
+      msg = 'Network/CORS error. Your browser may be blocking this. Try disabling extensions or open the file locally.';
     }
-    toast('✗ ' + msg, 'error');
+    showTestStatus(provider, 'error', '✗ ' + msg);
   } finally {
     if (btn) { btn.textContent = 'Test Key'; btn.disabled = false; }
   }
+}
+
+function showTestStatus(provider, type, msg) {
+  let el = document.getElementById('test-status-' + provider);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'test-status-' + provider;
+    el.style.cssText = 'margin-top:10px;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.5;border:1px solid';
+    const content = document.getElementById('content-' + provider);
+    if (content) content.appendChild(el);
+  }
+  const styles = {
+    info:    ['#0d0d20', '#2a2a5a', '#8888cc'],
+    success: ['#0a1a0a', '#1a4a1a', '#44cc44'],
+    error:   ['#1a0a0a', '#4a1a1a', '#ee4444'],
+    warn:    ['#1a1400', '#4a3a00', '#ccaa44'],
+  };
+  const [bg, border, color] = styles[type] || styles.info;
+  el.style.background = bg;
+  el.style.borderColor = border;
+  el.style.color = color;
+  el.textContent = msg;
 }
 
 // ─── DRAG & DROP ─────────────────────────────────────────────────────────────
@@ -822,16 +904,16 @@ async function extractClaude(key, b64, mt) {
 }
 
 async function extractGemini(key, b64, mt) {
-  // Use the model that worked during testing, or try in order
-  const savedModel = localStorage.getItem('cardscan_gemini_model');
-  const models = savedModel
-    ? [savedModel, 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest']
-    : ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
-  const uniqueModels = [...new Set(models)];
+  // Use the saved model from test, or discover dynamically
+  let model = localStorage.getItem('cardscan_gemini_model');
+  if (!model) {
+    model = await discoverGeminiModel(key);
+    localStorage.setItem('cardscan_gemini_model', model);
+  }
 
-  let lastErr = '';
-  for (const model of uniqueModels) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+  const makeRequest = async (m) => fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`,
+    {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -841,16 +923,25 @@ async function extractGemini(key, b64, mt) {
         ]}],
         generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
       })
-    });
-    if (r.ok) {
-      localStorage.setItem('cardscan_gemini_model', model);
-      const d = await r.json();
-      return parseJSON(d.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
     }
-    const e = await r.json().catch(() => ({}));
-    lastErr = e.error?.message || 'HTTP ' + r.status;
+  );
+
+  let r = await makeRequest(model);
+
+  // If saved model fails (404/400), rediscover and retry once
+  if (!r.ok && (r.status === 404 || r.status === 400)) {
+    localStorage.removeItem('cardscan_gemini_model');
+    model = await discoverGeminiModel(key);
+    localStorage.setItem('cardscan_gemini_model', model);
+    r = await makeRequest(model);
   }
-  throw new Error('Gemini error: ' + lastErr);
+
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error?.message || 'Gemini HTTP ' + r.status);
+  }
+  const d = await r.json();
+  return parseJSON(d.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
 }
 
 async function extractOpenAI(key, b64, mt) {
