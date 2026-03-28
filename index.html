@@ -357,38 +357,81 @@
       <span><strong style="color:#ccbb44">GitHub Pages detected.</strong> Gemini (Google) works perfectly from any hosted site. Claude requires the <code style="background:#1a1a00;padding:1px 4px;border-radius:2px">anthropic-dangerous-direct-browser-access</code> header (already included). OpenAI allows browser calls natively. Always click <strong style="color:#ccbb44">Test Key</strong> first to confirm your key and model are working.</span>
     </div>
 
-    <div class="api-tabs">
-      <button class="api-tab active" id="tab-claude" onclick="switchTab('claude')">
-        <div class="dot"></div> Claude (Anthropic)
-        <span class="free-badge limited">Free Tier</span>
+    <div class="api-tabs" style="flex-wrap:wrap">
+      <button class="api-tab active" id="tab-groq" onclick="switchTab('groq')">
+        <div class="dot"></div> Groq
+        <span class="free-badge free">FREE · FAST</span>
+      </button>
+      <button class="api-tab" id="tab-ollama" onclick="switchTab('ollama')">
+        <div class="dot"></div> Ollama
+        <span class="free-badge free">LOCAL · ∞</span>
       </button>
       <button class="api-tab" id="tab-gemini" onclick="switchTab('gemini')">
-        <div class="dot"></div> Gemini (Google)
-        <span class="free-badge free">Free</span>
+        <div class="dot"></div> Gemini
+        <span class="free-badge limited">20/day</span>
+      </button>
+      <button class="api-tab" id="tab-claude" onclick="switchTab('claude')">
+        <div class="dot"></div> Claude
+        <span class="free-badge limited">Credits</span>
       </button>
       <button class="api-tab" id="tab-openai" onclick="switchTab('openai')">
-        <div class="dot"></div> GPT-4o (OpenAI)
+        <div class="dot"></div> OpenAI
         <span class="free-badge limited">Credits</span>
       </button>
     </div>
 
-    <!-- Claude Tab -->
-    <div class="api-tab-content active" id="content-claude">
+    <!-- Groq Tab ★ RECOMMENDED -->
+    <div class="api-tab-content active" id="content-groq">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:#0a1a0a;border:1px solid #2a5a2a;border-radius:5px;padding:6px 12px;margin-bottom:14px;font-size:12px;color:#44cc44">
+        ★ Recommended — Free, fast (30 RPM), no rate-limit issues
+      </div>
       <div class="api-row">
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">Anthropic API Key</label>
-          <input class="form-input" type="password" id="claudeKey" placeholder="sk-ant-api03-..." oninput="saveKeys()">
+          <label class="form-label">Groq API Key</label>
+          <input class="form-input" type="password" id="groqKey" placeholder="gsk_..." oninput="saveKeys()">
         </div>
-        <button class="btn btn-primary" onclick="testApi('claude')">Test Key</button>
+        <button class="btn btn-primary" onclick="testApi('groq')">Test Key</button>
       </div>
       <div class="api-info">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div>Get your free API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> — New accounts get $5 free credits. Model used: <strong style="color:var(--text2)">claude-haiku-3-5</strong>. This app sends the required <code style="background:#0a0a20;padding:1px 5px;border-radius:3px;font-size:11px">anthropic-dangerous-direct-browser-access</code> header to allow browser-to-API calls. Keys stored locally only.</div>
+        <div>Get your <strong style="color:var(--green)">100% free</strong> key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> — No credit card needed. <strong style="color:var(--green)">30 RPM free</strong> (vs Gemini's 5 RPM). Uses <strong style="color:var(--text2)">meta-llama/llama-4-scout-17b-16e-instruct</strong> — excellent OCR accuracy. Keys stored in browser only.</div>
+      </div>
+    </div>
+
+    <!-- Ollama Tab -->
+    <div class="api-tab-content" id="content-ollama">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:#0a0a1a;border:1px solid #2a2a5a;border-radius:5px;padding:6px 12px;margin-bottom:14px;font-size:12px;color:#8888ff">
+        ⚡ Runs 100% on your PC — unlimited, private, no internet needed
+      </div>
+      <div class="api-row" style="grid-template-columns:1fr 1fr auto">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Ollama Base URL</label>
+          <input class="form-input" type="text" id="ollamaUrl" placeholder="http://localhost:11434" oninput="saveKeys()" value="http://localhost:11434">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Vision Model</label>
+          <input class="form-input" type="text" id="ollamaModel" placeholder="llava" oninput="saveKeys()" value="llava">
+        </div>
+        <button class="btn btn-primary" style="align-self:flex-end" onclick="testApi('ollama')">Test</button>
+      </div>
+      <div class="api-info" style="margin-top:12px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>
+          Install from <a href="https://ollama.com" target="_blank">ollama.com</a> — then run these commands:<br>
+          <code style="background:#0a0a20;padding:3px 7px;border-radius:3px;font-size:11px;display:inline-block;margin-top:4px">ollama pull llava</code>
+          <span style="color:var(--text3);font-size:11px"> (best vision model, ~4GB)</span><br>
+          <code style="background:#0a0a20;padding:3px 7px;border-radius:3px;font-size:11px;display:inline-block;margin-top:4px">OLLAMA_ORIGINS=* ollama serve</code>
+          <span style="color:var(--text3);font-size:11px"> (enables CORS for browser access)</span><br>
+          <span style="color:var(--amber);font-size:11px">⚠ Must run with OLLAMA_ORIGINS=* flag, otherwise browser cannot connect.</span>
+        </div>
       </div>
     </div>
 
     <!-- Gemini Tab -->
     <div class="api-tab-content" id="content-gemini">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:#1a1000;border:1px solid #4a3000;border-radius:5px;padding:6px 12px;margin-bottom:14px;font-size:12px;color:#cc8844">
+        ⚠ Very limited free tier — only 20 requests/day, 5 per minute
+      </div>
       <div class="api-row">
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Google Gemini API Key</label>
@@ -398,7 +441,22 @@
       </div>
       <div class="api-info">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div>Get your <strong style="color:var(--green)">100% free</strong> API key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> — Free with generous limits (15 req/min, 1500/day). <strong style="color:var(--text2)">Recommended for zero cost.</strong> Click <strong style="color:var(--text2)">Test Key</strong> — the app will automatically discover and save the best vision model available on your account (queries your actual model list, no guessing).</div>
+        <div>Key from <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>. Free tier is <strong style="color:var(--amber)">very restricted</strong> — 5 RPM and only 20 requests/day on Gemini 2.5 Flash. The app auto-selects the best available model and rate-paces all requests. <strong style="color:var(--text2)">Switch to Groq for a much better free experience.</strong></div>
+      </div>
+    </div>
+
+    <!-- Claude Tab -->
+    <div class="api-tab-content" id="content-claude">
+      <div class="api-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Anthropic API Key</label>
+          <input class="form-input" type="password" id="claudeKey" placeholder="sk-ant-api03-..." oninput="saveKeys()">
+        </div>
+        <button class="btn btn-primary" onclick="testApi('claude')">Test Key</button>
+      </div>
+      <div class="api-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>Get your key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> — New accounts get $5 free credits. Model: <strong style="color:var(--text2)">claude-haiku-3-5</strong>. Requires the <code style="background:#0a0a20;padding:1px 4px;border-radius:2px;font-size:11px">anthropic-dangerous-direct-browser-access</code> header (already included). Keys stored locally only.</div>
       </div>
     </div>
 
@@ -413,7 +471,7 @@
       </div>
       <div class="api-info">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div>Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> — Model used: <strong style="color:var(--text2)">gpt-4o-mini</strong>. <strong style="color:var(--amber)">Important:</strong> OpenAI no longer gives free credits to new accounts — you must add a payment method and load at least $5 at <a href="https://platform.openai.com/settings/billing" target="_blank">platform.openai.com/settings/billing</a>. If test shows "quota exceeded", your key is valid but needs billing setup. Use Gemini instead for truly free usage.</div>
+        <div>Key from <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> — Model: <strong style="color:var(--text2)">gpt-4o-mini</strong>. <strong style="color:var(--amber)">Requires billing setup</strong> — add payment at <a href="https://platform.openai.com/settings/billing" target="_blank">platform.openai.com/settings/billing</a>. OpenAI removed free credits for new accounts.</div>
       </div>
     </div>
   </div>
@@ -422,7 +480,7 @@
   <div id="noApiWarn" style="display:none;background:#1a1000;border:1px solid #3a2800;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffaa44" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     <div style="font-size:13px;color:#cc9944">
-      <strong style="color:#ffaa44">No API key configured.</strong> Click <strong style="color:#ffaa44">API Settings</strong> above to add your key. Gemini is free and recommended for zero cost.
+      <strong style="color:#ffaa44">No API configured.</strong> Click <strong style="color:#ffaa44">API Settings</strong> above. <strong style="color:#44cc44">Groq is recommended</strong> — free key at <a href="https://console.groq.com" target="_blank" style="color:#44cc44">console.groq.com</a>, no credit card, 30 RPM. Or use <strong>Ollama</strong> for fully local/offline processing.
     </div>
   </div>
 
@@ -528,9 +586,12 @@ const ICONS = {
 
 let cards = [];
 let editingId = null;
-let activeTab = 'claude';
+let activeTab = 'groq';
 let isProcessing = false;
 let processQueue = [];
+
+const PROVIDERS = ['groq','ollama','gemini','claude','openai'];
+const PROVIDER_NAMES = { groq:'Groq (Llama)', ollama:'Ollama (Local)', gemini:'Gemini (Google)', claude:'Claude (Anthropic)', openai:'GPT-4o Mini' };
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 (function init() {
@@ -538,40 +599,43 @@ let processQueue = [];
   if (saved) {
     try {
       const k = JSON.parse(saved);
-      if (k.claude) document.getElementById('claudeKey').value = k.claude;
-      if (k.gemini) document.getElementById('geminiKey').value = k.gemini;
-      if (k.openai) document.getElementById('openaiKey').value = k.openai;
+      if (k.groq)   { const el = document.getElementById('groqKey');   if(el) el.value = k.groq; }
+      if (k.gemini) { const el = document.getElementById('geminiKey'); if(el) el.value = k.gemini; }
+      if (k.claude) { const el = document.getElementById('claudeKey'); if(el) el.value = k.claude; }
+      if (k.openai) { const el = document.getElementById('openaiKey'); if(el) el.value = k.openai; }
+      if (k.ollamaUrl)   { const el = document.getElementById('ollamaUrl');   if(el) el.value = k.ollamaUrl; }
+      if (k.ollamaModel) { const el = document.getElementById('ollamaModel'); if(el) el.value = k.ollamaModel; }
       if (k.activeTab) { activeTab = k.activeTab; switchTab(activeTab, true); }
     } catch(e) {}
   }
-  // Check for a saved preferred tab with a key
   updateApiStatus();
-  // Show no-API warning if needed
   updateNoApiWarning();
 })();
 
 // ─── API PANEL ───────────────────────────────────────────────────────────────
 function toggleApiPanel() {
-  const panel = document.getElementById('apiPanel');
-  panel.classList.toggle('open');
+  document.getElementById('apiPanel').classList.toggle('open');
 }
 
 function switchTab(tab, silent) {
   activeTab = tab;
   document.querySelectorAll('.api-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.api-tab-content').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.getElementById('content-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab)?.classList.add('active');
+  document.getElementById('content-' + tab)?.classList.add('active');
   if (!silent) saveKeys();
   updateApiStatus();
 }
 
 function saveKeys() {
   const keys = {
-    claude: document.getElementById('claudeKey').value,
-    gemini: document.getElementById('geminiKey').value,
-    openai: document.getElementById('openaiKey').value,
-    activeTab: activeTab
+    groq:        document.getElementById('groqKey')?.value || '',
+    gemini:      document.getElementById('geminiKey')?.value || '',
+    claude:      document.getElementById('claudeKey')?.value || '',
+    openai:      document.getElementById('openaiKey')?.value || '',
+    ollamaUrl:   document.getElementById('ollamaUrl')?.value || 'http://localhost:11434',
+    ollamaModel: document.getElementById('ollamaModel')?.value || 'llava',
+    activeTab:   activeTab
   };
   localStorage.setItem('cardscan_keys', JSON.stringify(keys));
   updateApiStatus();
@@ -579,64 +643,52 @@ function saveKeys() {
 }
 
 function getActiveKey() {
-  const id = activeTab + 'Key';
-  return document.getElementById(id)?.value?.trim() || '';
+  if (activeTab === 'ollama') return document.getElementById('ollamaUrl')?.value?.trim() || '';
+  return document.getElementById(activeTab + 'Key')?.value?.trim() || '';
 }
 
 function updateApiStatus() {
   const key = getActiveKey();
   const label = document.getElementById('apiStatusLabel');
   if (key) {
-    const names = { claude: 'Claude (Anthropic)', gemini: 'Gemini (Google)', openai: 'GPT-4o Mini (OpenAI)' };
-    label.textContent = '✓ ' + (names[activeTab] || activeTab) + ' active';
+    label.textContent = '✓ ' + (PROVIDER_NAMES[activeTab] || activeTab) + ' active';
     label.style.color = 'var(--green)';
   } else {
     label.textContent = 'No API configured';
     label.style.color = 'var(--text3)';
   }
-  // Update tab dots
-  ['claude','gemini','openai'].forEach(t => {
+  PROVIDERS.forEach(t => {
     const dot = document.querySelector('#tab-' + t + ' .dot');
-    const k = document.getElementById(t + 'Key')?.value?.trim();
-    if (dot) dot.style.background = k ? 'var(--green)' : 'var(--border2)';
+    if (!dot) return;
+    const hasKey = t === 'ollama'
+      ? (document.getElementById('ollamaUrl')?.value?.trim() || '')
+      : (document.getElementById(t + 'Key')?.value?.trim() || '');
+    dot.style.background = hasKey ? 'var(--green)' : 'var(--border2)';
   });
 }
 
 function updateNoApiWarning() {
   const key = getActiveKey();
   const warn = document.getElementById('noApiWarn');
-  warn.style.display = key ? 'none' : 'flex';
+  if (warn) warn.style.display = key ? 'none' : 'flex';
 }
 
 // ─── GEMINI MODEL DISCOVERY ───────────────────────────────────────────────────
 async function discoverGeminiModel(key) {
-  // 1. Try listing available models (no quota cost, just metadata)
   try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
     if (r.ok) {
       const d = await r.json();
       const available = (d.models || []).map(m => m.name.replace('models/', ''));
-      const preferred = [
-        'gemini-2.0-flash-lite',  // highest free RPM
-        'gemini-2.0-flash',
-        'gemini-1.5-flash-8b',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-      ];
+      const preferred = ['gemini-2.0-flash-lite','gemini-2.0-flash','gemini-1.5-flash-8b','gemini-1.5-flash','gemini-1.5-pro'];
       for (const p of preferred) {
         const match = available.find(a => a === p || a.startsWith(p + '-'));
-        if (match) {
-          localStorage.setItem('cardscan_gemini_model', match);
-          return match;
-        }
+        if (match) { localStorage.setItem('cardscan_gemini_model', match); return match; }
       }
-      // Any gemini model that's not an embedding
       const fallback = available.find(a => a.includes('gemini') && !a.includes('embed') && !a.includes('aqa'));
       if (fallback) { localStorage.setItem('cardscan_gemini_model', fallback); return fallback; }
     }
-  } catch(e) { /* fall through */ }
-
-  // 2. Fallback: return best-guess without a test call (save quota)
+  } catch(e) {}
   const guess = 'gemini-2.0-flash-lite';
   localStorage.setItem('cardscan_gemini_model', guess);
   return guess;
@@ -644,72 +696,90 @@ async function discoverGeminiModel(key) {
 
 // ─── TEST API ─────────────────────────────────────────────────────────────────
 async function testApi(provider) {
-  const keyEl = document.getElementById(provider + 'Key');
-  const key = keyEl?.value?.trim();
-  if (!key) { toast('Please enter an API key first.', 'error'); return; }
-
   const btn = document.querySelector(`#content-${provider} .btn-primary`);
   if (btn) { btn.textContent = 'Testing…'; btn.disabled = true; }
-  showTestStatus(provider, 'info', 'Connecting to API…');
+  showTestStatus(provider, 'info', 'Connecting…');
 
   try {
-    if (provider === 'claude') {
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
+    if (provider === 'groq') {
+      const key = document.getElementById('groqKey')?.value?.trim();
+      if (!key) { showTestStatus(provider, 'error', '✗ Please enter your Groq API key'); return; }
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({ model: 'claude-haiku-3-5-20241022', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({ model: 'llama-3.2-11b-vision-preview', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
       });
-      if (!r.ok) {
-        const e = await r.json().catch(()=>({}));
-        throw new Error(e.error?.message || 'HTTP ' + r.status);
+      if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
+      showTestStatus(provider, 'success', '✓ Groq key valid — Llama 4 Scout vision ready. 30 RPM free, no daily limit!');
+      saveKeys();
+
+    } else if (provider === 'ollama') {
+      const url = document.getElementById('ollamaUrl')?.value?.trim() || 'http://localhost:11434';
+      const model = document.getElementById('ollamaModel')?.value?.trim() || 'llava';
+      showTestStatus(provider, 'info', `Checking Ollama at ${url}…`);
+      const r = await fetch(`${url}/api/tags`).catch(() => null);
+      if (!r || !r.ok) {
+        showTestStatus(provider, 'error', `✗ Cannot reach Ollama at ${url}. Make sure it's running with: OLLAMA_ORIGINS=* ollama serve`);
+        return;
       }
-      showTestStatus(provider, 'success', '✓ Claude key valid — claude-haiku-3-5 ready');
+      const d = await r.json();
+      const models = (d.models || []).map(m => m.name);
+      const hasModel = models.some(m => m.startsWith(model.split(':')[0]));
+      if (!hasModel) {
+        showTestStatus(provider, 'warn', `⚠ Ollama is running but model "${model}" not found. Run: ollama pull ${model}\nAvailable: ${models.join(', ') || 'none'}`);
+        return;
+      }
+      showTestStatus(provider, 'success', `✓ Ollama connected — model "${model}" ready. Unlimited local processing!`);
       saveKeys();
 
     } else if (provider === 'gemini') {
-      showTestStatus(provider, 'info', 'Querying your available Gemini models…');
-      // discoverGeminiModel uses /models list (no generateContent call = no quota used)
+      const key = document.getElementById('geminiKey')?.value?.trim();
+      if (!key) { showTestStatus(provider, 'error', '✗ Please enter your Gemini API key'); return; }
+      showTestStatus(provider, 'info', 'Querying available models (no quota used)…');
       const model = await discoverGeminiModel(key);
-      showTestStatus(provider, 'success', `✓ Key valid — will use model: ${model} (auto-selected, free tier)`);
+      showTestStatus(provider, 'success', `✓ Key valid — model: ${model}. Note: free tier = 5 RPM, ~20/day. Consider Groq instead.`);
+      saveKeys();
+
+    } else if (provider === 'claude') {
+      const key = document.getElementById('claudeKey')?.value?.trim();
+      if (!key) { showTestStatus(provider, 'error', '✗ Please enter your Claude API key'); return; }
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+        body: JSON.stringify({ model:'claude-haiku-3-5-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
+      });
+      if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
+      showTestStatus(provider, 'success', '✓ Claude key valid — claude-haiku-3-5 ready');
       saveKeys();
 
     } else if (provider === 'openai') {
+      const key = document.getElementById('openaiKey')?.value?.trim();
+      if (!key) { showTestStatus(provider, 'error', '✗ Please enter your OpenAI API key'); return; }
       const r = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+        headers: { 'Content-Type':'application/json','Authorization':'Bearer '+key },
+        body: JSON.stringify({ model:'gpt-4o-mini', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
       });
       if (!r.ok) {
         const e = await r.json().catch(()=>({}));
-        const msg = e.error?.message || '';
         const code = e.error?.code || '';
-        if (code === 'insufficient_quota' || msg.includes('quota') || msg.includes('billing')) {
-          showTestStatus(provider, 'warn',
-            '⚠ Key is valid but has no billing credits. Add a payment method at platform.openai.com/settings/billing — new keys need at least $5 loaded to use GPT-4o-mini vision.');
-        } else if (r.status === 401) {
-          showTestStatus(provider, 'error', '✗ Invalid API key — check you copied the full key starting with sk-');
-        } else {
-          showTestStatus(provider, 'error', '✗ ' + (msg || 'HTTP ' + r.status));
-        }
+        if (code === 'insufficient_quota' || (e.error?.message||'').includes('quota')) {
+          showTestStatus(provider, 'warn', '⚠ Key valid but no billing credits. Add payment at platform.openai.com/settings/billing');
+        } else { throw new Error(e.error?.message || 'HTTP ' + r.status); }
         return;
       }
       showTestStatus(provider, 'success', '✓ OpenAI key valid — gpt-4o-mini ready');
       saveKeys();
     }
-
   } catch(e) {
     let msg = e.message || 'Unknown error';
     if (msg.includes('Failed to fetch') || msg.includes('Load failed') || msg.includes('NetworkError')) {
-      msg = 'Network/CORS error. Your browser may be blocking this. Try disabling extensions or open the file locally.';
+      if (provider === 'ollama') msg = 'Cannot reach Ollama. Start it with: OLLAMA_ORIGINS=* ollama serve';
+      else msg = 'Network error — check your connection or try disabling browser extensions';
     }
     showTestStatus(provider, 'error', '✗ ' + msg);
   } finally {
-    if (btn) { btn.textContent = 'Test Key'; btn.disabled = false; }
+    if (btn) { btn.textContent = provider === 'ollama' ? 'Test' : 'Test Key'; btn.disabled = false; }
   }
 }
 
@@ -718,21 +788,12 @@ function showTestStatus(provider, type, msg) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'test-status-' + provider;
-    el.style.cssText = 'margin-top:10px;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.5;border:1px solid';
-    const content = document.getElementById('content-' + provider);
-    if (content) content.appendChild(el);
+    el.style.cssText = 'margin-top:10px;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.6;border:1px solid;white-space:pre-line';
+    document.getElementById('content-' + provider)?.appendChild(el);
   }
-  const styles = {
-    info:    ['#0d0d20', '#2a2a5a', '#8888cc'],
-    success: ['#0a1a0a', '#1a4a1a', '#44cc44'],
-    error:   ['#1a0a0a', '#4a1a1a', '#ee4444'],
-    warn:    ['#1a1400', '#4a3a00', '#ccaa44'],
-  };
-  const [bg, border, color] = styles[type] || styles.info;
-  el.style.background = bg;
-  el.style.borderColor = border;
-  el.style.color = color;
-  el.textContent = msg;
+  const styles = { info:['#0d0d20','#2a2a5a','#8888cc'], success:['#0a1a0a','#1a4a1a','#44cc44'], error:['#1a0a0a','#4a1a1a','#ee4444'], warn:['#1a1400','#4a3a00','#ccaa44'] };
+  const [bg,border,color] = styles[type]||styles.info;
+  el.style.background=bg; el.style.borderColor=border; el.style.color=color; el.textContent=msg;
 }
 
 // ─── DRAG & DROP ─────────────────────────────────────────────────────────────
@@ -931,14 +992,89 @@ async function geminiCall(key, body) {
 async function extractData(file) {
   const b64 = await toBase64(file);
   const mt  = file.type || 'image/jpeg';
-  const provider = activeTab;
   const key = getActiveKey();
   if (!key) throw new Error('No API key configured');
 
-  if (provider === 'claude')  return extractClaude(key, b64, mt);
-  if (provider === 'gemini')  return extractGemini(key, b64, mt);
-  if (provider === 'openai')  return extractOpenAI(key, b64, mt);
+  if (activeTab === 'groq')   return extractGroq(key, b64, mt);
+  if (activeTab === 'ollama') return extractOllama(b64, mt);
+  if (activeTab === 'claude') return extractClaude(key, b64, mt);
+  if (activeTab === 'gemini') return extractGemini(key, b64, mt);
+  if (activeTab === 'openai') return extractOpenAI(key, b64, mt);
   throw new Error('Unknown provider');
+}
+
+// Groq — OpenAI-compatible API, 30 RPM free, vision via Llama
+async function extractGroq(key, b64, mt) {
+  // Try vision models in order of preference
+  const models = [
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'llama-3.2-90b-vision-preview',
+    'llama-3.2-11b-vision-preview',
+  ];
+  let savedModel = localStorage.getItem('cardscan_groq_model');
+  if (savedModel) models.unshift(savedModel);
+  const uniqueModels = [...new Set(models)];
+
+  let lastErr = '';
+  for (const model of uniqueModels) {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model,
+        max_tokens: 800,
+        messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
+          { type: 'text', text: OCR_PROMPT }
+        ]}]
+      })
+    });
+    if (r.ok) {
+      localStorage.setItem('cardscan_groq_model', model);
+      const d = await r.json();
+      return parseJSON(d.choices?.[0]?.message?.content || '{}');
+    }
+    if (r.status === 429) {
+      // Groq 30 RPM — wait 3s and retry once
+      await sleep(3000);
+      const r2 = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({ model, max_tokens:800, messages:[{role:'user',content:[{type:'image_url',image_url:{url:`data:${mt};base64,${b64}`}},{type:'text',text:OCR_PROMPT}]}] })
+      });
+      if (r2.ok) { localStorage.setItem('cardscan_groq_model', model); const d = await r2.json(); return parseJSON(d.choices?.[0]?.message?.content||'{}'); }
+    }
+    const e = await r.json().catch(() => ({}));
+    lastErr = e.error?.message || 'HTTP ' + r.status;
+    // If model not found (404/400), try next model
+    if (r.status !== 404 && r.status !== 400) break;
+  }
+  throw new Error('Groq error: ' + lastErr);
+}
+
+// Ollama — 100% local, no rate limits, no API key needed
+async function extractOllama(b64, mt) {
+  const url   = document.getElementById('ollamaUrl')?.value?.trim()   || 'http://localhost:11434';
+  const model = document.getElementById('ollamaModel')?.value?.trim() || 'llava';
+
+  const r = await fetch(`${url}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      prompt: OCR_PROMPT,
+      images: [b64],
+      stream: false,
+      options: { temperature: 0.1, num_predict: 800 }
+    })
+  }).catch(() => { throw new Error(`Cannot connect to Ollama at ${url}. Run: OLLAMA_ORIGINS=* ollama serve`); });
+
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `Ollama HTTP ${r.status}`);
+  }
+  const d = await r.json();
+  return parseJSON(d.response || '{}');
 }
 
 async function extractClaude(key, b64, mt) {
