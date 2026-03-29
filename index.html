@@ -362,6 +362,10 @@
         <div class="dot"></div> Groq
         <span class="free-badge free">FREE · FAST</span>
       </button>
+      <button class="api-tab" id="tab-together" onclick="switchTab('together')">
+        <div class="dot"></div> Together AI
+        <span class="free-badge free">$25 FREE</span>
+      </button>
       <button class="api-tab" id="tab-ollama" onclick="switchTab('ollama')">
         <div class="dot"></div> Ollama
         <span class="free-badge free">LOCAL · ∞</span>
@@ -383,7 +387,7 @@
     <!-- Groq Tab ★ RECOMMENDED -->
     <div class="api-tab-content active" id="content-groq">
       <div style="display:inline-flex;align-items:center;gap:8px;background:#0a1a0a;border:1px solid #2a5a2a;border-radius:5px;padding:6px 12px;margin-bottom:14px;font-size:12px;color:#44cc44">
-        ★ Recommended — Free, fast (30 RPM), no rate-limit issues
+        ★ Recommended — Free, fast (30 RPM), auto-detects latest live model
       </div>
       <div class="api-row">
         <div class="form-group" style="margin-bottom:0">
@@ -394,7 +398,25 @@
       </div>
       <div class="api-info">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div>Get your <strong style="color:var(--green)">100% free</strong> key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> — No credit card needed. <strong style="color:var(--green)">30 RPM free</strong> (vs Gemini's 5 RPM). Uses <strong style="color:var(--text2)">meta-llama/llama-4-scout-17b-16e-instruct</strong> — excellent OCR accuracy. Keys stored in browser only.</div>
+        <div>Get your <strong style="color:var(--green)">100% free</strong> key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> — No credit card needed. <strong style="color:var(--green)">30 RPM free</strong>. App queries Groq's live model list every time — automatically uses the latest active vision model, never hits a decommissioned model again. Keys stored in browser only.</div>
+      </div>
+    </div>
+
+    <!-- Together AI Tab -->
+    <div class="api-tab-content" id="content-together">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:#0a1a0a;border:1px solid #2a5a2a;border-radius:5px;padding:6px 12px;margin-bottom:14px;font-size:12px;color:#44cc44">
+        ★ Best public alternative to Ollama — $25 free, works from any device on internet
+      </div>
+      <div class="api-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Together AI API Key</label>
+          <input class="form-input" type="password" id="togetherKey" placeholder="..." oninput="saveKeys()">
+        </div>
+        <button class="btn btn-primary" onclick="testApi('together')">Test Key</button>
+      </div>
+      <div class="api-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>Get <strong style="color:var(--green)">$25 free credits</strong> (no credit card) at <a href="https://api.together.ai" target="_blank">api.together.ai</a> → Sign up → API Keys. Runs the same open-source Llama vision models as Ollama but <strong style="color:var(--text2)">hosted in the cloud</strong> — works on any device with internet, nothing to install. Uses <strong style="color:var(--text2)">Llama-3.2-11B-Vision-Instruct</strong>. $25 = thousands of cards at ~$0.001 each.</div>
       </div>
     </div>
 
@@ -590,8 +612,8 @@ let activeTab = 'groq';
 let isProcessing = false;
 let processQueue = [];
 
-const PROVIDERS = ['groq','ollama','gemini','claude','openai'];
-const PROVIDER_NAMES = { groq:'Groq (Llama)', ollama:'Ollama (Local)', gemini:'Gemini (Google)', claude:'Claude (Anthropic)', openai:'GPT-4o Mini' };
+const PROVIDERS = ['groq','together','ollama','gemini','claude','openai'];
+const PROVIDER_NAMES = { groq:'Groq (Llama)', together:'Together AI', ollama:'Ollama (Local)', gemini:'Gemini (Google)', claude:'Claude (Anthropic)', openai:'GPT-4o Mini' };
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 (function init() {
@@ -599,8 +621,9 @@ const PROVIDER_NAMES = { groq:'Groq (Llama)', ollama:'Ollama (Local)', gemini:'G
   if (saved) {
     try {
       const k = JSON.parse(saved);
-      if (k.groq)   { const el = document.getElementById('groqKey');   if(el) el.value = k.groq; }
-      if (k.gemini) { const el = document.getElementById('geminiKey'); if(el) el.value = k.gemini; }
+      if (k.groq)   { const el = document.getElementById('groqKey');     if(el) el.value = k.groq; }
+      if (k.together){ const el = document.getElementById('togetherKey'); if(el) el.value = k.together; }
+      if (k.gemini) { const el = document.getElementById('geminiKey');   if(el) el.value = k.gemini; }
       if (k.claude) { const el = document.getElementById('claudeKey'); if(el) el.value = k.claude; }
       if (k.openai) { const el = document.getElementById('openaiKey'); if(el) el.value = k.openai; }
       if (k.ollamaUrl)   { const el = document.getElementById('ollamaUrl');   if(el) el.value = k.ollamaUrl; }
@@ -630,6 +653,7 @@ function switchTab(tab, silent) {
 function saveKeys() {
   const keys = {
     groq:        document.getElementById('groqKey')?.value || '',
+    together:    document.getElementById('togetherKey')?.value || '',
     gemini:      document.getElementById('geminiKey')?.value || '',
     claude:      document.getElementById('claudeKey')?.value || '',
     openai:      document.getElementById('openaiKey')?.value || '',
@@ -644,7 +668,8 @@ function saveKeys() {
 
 function getActiveKey() {
   if (activeTab === 'ollama') return document.getElementById('ollamaUrl')?.value?.trim() || '';
-  return document.getElementById(activeTab + 'Key')?.value?.trim() || '';
+  const keyId = activeTab === 'together' ? 'togetherKey' : activeTab + 'Key';
+  return document.getElementById(keyId)?.value?.trim() || '';
 }
 
 function updateApiStatus() {
@@ -704,13 +729,21 @@ async function testApi(provider) {
     if (provider === 'groq') {
       const key = document.getElementById('groqKey')?.value?.trim();
       if (!key) { showTestStatus(provider, 'error', '✗ Please enter your Groq API key'); return; }
-      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      showTestStatus(provider, 'info', 'Fetching available Groq vision models…');
+      const model = await discoverGroqModel(key);
+      showTestStatus(provider, 'success', `✓ Groq key valid — using: ${model}\n30 RPM free, no daily limit, no rate-limit issues!`);
+      saveKeys();
+
+    } else if (provider === 'together') {
+      const key = document.getElementById('togetherKey')?.value?.trim();
+      if (!key) { showTestStatus(provider, 'error', '✗ Please enter your Together AI API key'); return; }
+      const r = await fetch('https://api.together.xyz/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-        body: JSON.stringify({ model: 'llama-3.2-11b-vision-preview', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+        body: JSON.stringify({ model: 'meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
       });
       if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
-      showTestStatus(provider, 'success', '✓ Groq key valid — Llama 4 Scout vision ready. 30 RPM free, no daily limit!');
+      showTestStatus(provider, 'success', '✓ Together AI key valid — Llama-3.2-11B-Vision ready. Works from any device on internet!');
       saveKeys();
 
     } else if (provider === 'ollama') {
@@ -995,64 +1028,129 @@ async function extractData(file) {
   const key = getActiveKey();
   if (!key) throw new Error('No API key configured');
 
-  if (activeTab === 'groq')   return extractGroq(key, b64, mt);
-  if (activeTab === 'ollama') return extractOllama(b64, mt);
-  if (activeTab === 'claude') return extractClaude(key, b64, mt);
-  if (activeTab === 'gemini') return extractGemini(key, b64, mt);
-  if (activeTab === 'openai') return extractOpenAI(key, b64, mt);
+  if (activeTab === 'groq')     return extractGroq(key, b64, mt);
+  if (activeTab === 'together') return extractTogether(key, b64, mt);
+  if (activeTab === 'ollama')   return extractOllama(b64, mt);
+  if (activeTab === 'claude')   return extractClaude(key, b64, mt);
+  if (activeTab === 'gemini')   return extractGemini(key, b64, mt);
+  if (activeTab === 'openai')   return extractOpenAI(key, b64, mt);
   throw new Error('Unknown provider');
 }
 
-// Groq — OpenAI-compatible API, 30 RPM free, vision via Llama
-async function extractGroq(key, b64, mt) {
-  // Try vision models in order of preference
-  const models = [
-    'meta-llama/llama-4-scout-17b-16e-instruct',
-    'llama-3.2-90b-vision-preview',
-    'llama-3.2-11b-vision-preview',
-  ];
-  let savedModel = localStorage.getItem('cardscan_groq_model');
-  if (savedModel) models.unshift(savedModel);
-  const uniqueModels = [...new Set(models)];
+// ─── GROQ MODEL DISCOVERY ────────────────────────────────────────────────────
+// Queries the live /models endpoint so we never use a decommissioned model
+async function discoverGroqModel(key) {
+  const cached = localStorage.getItem('cardscan_groq_model');
 
-  let lastErr = '';
-  for (const model of uniqueModels) {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({
-        model,
-        max_tokens: 800,
-        messages: [{ role: 'user', content: [
-          { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
-          { type: 'text', text: OCR_PROMPT }
-        ]}]
-      })
+  // Always refresh from API — models get decommissioned frequently
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { 'Authorization': 'Bearer ' + key }
     });
     if (r.ok) {
-      localStorage.setItem('cardscan_groq_model', model);
       const d = await r.json();
-      return parseJSON(d.choices?.[0]?.message?.content || '{}');
+      const all = (d.data || []).map(m => m.id);
+
+      // Priority list of known vision-capable model name patterns
+      const preferred = [
+        'llama-4-scout',
+        'llama-4-maverick',
+        'llama-3.3',
+        'llama-3.2-90b',
+        'llama-3.2-11b',
+        'llava',
+        'llama-3.1',
+      ];
+
+      for (const pref of preferred) {
+        const match = all.find(m => m.includes(pref) && !m.includes('text-only') && !m.includes('tool'));
+        if (match) {
+          localStorage.setItem('cardscan_groq_model', match);
+          return match;
+        }
+      }
+
+      // Fallback: any llama model that's not pure text
+      const fb = all.find(m => m.includes('llama') && !m.includes('guard') && !m.includes('tool'));
+      if (fb) { localStorage.setItem('cardscan_groq_model', fb); return fb; }
     }
-    if (r.status === 429) {
-      // Groq 30 RPM — wait 3s and retry once
-      await sleep(3000);
-      const r2 = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-        body: JSON.stringify({ model, max_tokens:800, messages:[{role:'user',content:[{type:'image_url',image_url:{url:`data:${mt};base64,${b64}`}},{type:'text',text:OCR_PROMPT}]}] })
-      });
-      if (r2.ok) { localStorage.setItem('cardscan_groq_model', model); const d = await r2.json(); return parseJSON(d.choices?.[0]?.message?.content||'{}'); }
-    }
-    const e = await r.json().catch(() => ({}));
-    lastErr = e.error?.message || 'HTTP ' + r.status;
-    // If model not found (404/400), try next model
-    if (r.status !== 404 && r.status !== 400) break;
-  }
-  throw new Error('Groq error: ' + lastErr);
+  } catch(e) { /* fall through to cached */ }
+
+  if (cached) return cached;
+  throw new Error('Could not find any active Groq vision model. Check your API key or try regenerating it at console.groq.com');
 }
 
-// Ollama — 100% local, no rate limits, no API key needed
+// Groq — OpenAI-compatible API, 30 RPM free, Llama vision models
+async function extractGroq(key, b64, mt) {
+  // Always get fresh model (auto-handles decommissioning)
+  const model = await discoverGroqModel(key);
+
+  const body = JSON.stringify({
+    model,
+    max_tokens: 800,
+    messages: [{ role: 'user', content: [
+      { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
+      { type: 'text', text: OCR_PROMPT }
+    ]}]
+  });
+
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+
+  let r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method:'POST', headers, body });
+
+  // If model rejected (decommissioned since last discovery), clear cache and retry once
+  if (r.status === 400 || r.status === 404) {
+    localStorage.removeItem('cardscan_groq_model');
+    const freshModel = await discoverGroqModel(key);
+    const body2 = JSON.stringify({ model:freshModel, max_tokens:800, messages:[{role:'user',content:[{type:'image_url',image_url:{url:`data:${mt};base64,${b64}`}},{type:'text',text:OCR_PROMPT}]}] });
+    r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method:'POST', headers, body:body2 });
+  }
+
+  // Rate limited — Groq 30 RPM is generous, just wait a few seconds
+  if (r.status === 429) {
+    const wait = parseInt(r.headers.get('Retry-After') || '3', 10) * 1000;
+    updateRateLimitBanner(true, `Groq rate limit — retrying in ${Math.round(wait/1000)}s…`);
+    await sleep(wait);
+    updateRateLimitBanner(false);
+    r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method:'POST', headers, body });
+  }
+
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error?.message || `Groq HTTP ${r.status}`);
+  }
+  const d = await r.json();
+  return parseJSON(d.choices?.[0]?.message?.content || '{}');
+}
+
+// Together AI — hosted open-source models, $25 free credit, works from any device
+async function extractTogether(key, b64, mt) {
+  const model = 'meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo';
+  const r = await fetch('https://api.together.xyz/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify({
+      model,
+      max_tokens: 800,
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
+        { type: 'text', text: OCR_PROMPT }
+      ]}]
+    })
+  });
+  if (r.status === 429) {
+    await sleep(5000);
+    return extractTogether(key, b64, mt);
+  }
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error?.message || `Together AI HTTP ${r.status}`);
+  }
+  const d = await r.json();
+  return parseJSON(d.choices?.[0]?.message?.content || '{}');
+}
+
+// Ollama — 100% local
 async function extractOllama(b64, mt) {
   const url   = document.getElementById('ollamaUrl')?.value?.trim()   || 'http://localhost:11434';
   const model = document.getElementById('ollamaModel')?.value?.trim() || 'llava';
