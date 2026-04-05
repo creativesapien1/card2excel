@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CardScan Pro — AI Business Card Scanner</title>
+<script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -303,6 +304,29 @@
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+
+  /* ── MATCH/MERGE UI ── */
+  .match-badge {
+    font-size: 9px; font-family: var(--mono); padding: 2px 7px; border-radius: 10px;
+    letter-spacing: .5px; text-transform: uppercase; cursor: pointer;
+  }
+  .match-badge.merged { background: #1a2a1a; color: #44cc44; border: 1px solid #2a5a2a; }
+  .match-badge.pending { background: #1a1a2a; color: #8888ff; border: 1px solid #3a3a6a; animation: pulse 2s ease infinite; }
+  .match-badge.back { background: #1a2020; color: #44ddcc; border: 1px solid #2a4a4a; }
+
+  .merge-card {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 14px;
+  }
+  .merge-card-pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+  .merge-side { background: var(--bg1); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+  .merge-side-label { font-size: 9px; font-family: var(--mono); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .merge-arrow { color: var(--accent); font-size: 18px; text-align: center; }
+  .merge-field-row { font-size: 11px; margin: 3px 0; }
+  .merge-field-key { color: var(--text3); display: inline-block; width: 70px; font-family: var(--mono); font-size: 10px; }
+  .merge-field-val { color: var(--text1); }
+  .merge-field-new { color: var(--accent2); }
+  .confidence-bar { height: 4px; border-radius: 2px; margin: 8px 0 4px; background: var(--border2); overflow: hidden; }
+  .confidence-fill { height: 100%; border-radius: 2px; transition: width .3s; }
 </style>
 </head>
 <body>
@@ -590,6 +614,24 @@
   </div>
 </div>
 
+<!-- MERGE REVIEW MODAL -->
+<div class="modal-backdrop" id="mergeModal" onclick="closeMergeModal(event)">
+  <div class="modal" style="width:680px;max-width:96vw" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">🔗 Possible Card Matches Found</span>
+      <button class="modal-close" onclick="closeMergeModal()">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6">
+      The AI detected these cards may be front/back sides of the same business card. Review each match and decide whether to merge them. Merging fills empty fields only — existing data is never overwritten.
+    </p>
+    <div id="mergeList" style="display:flex;flex-direction:column;gap:12px;max-height:55vh;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="dismissAllMerges()">Dismiss All</button>
+      <button class="btn btn-primary" onclick="acceptAllMerges()">Accept All Matches</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -611,28 +653,48 @@ let editingId = null;
 let activeTab = 'groq';
 let isProcessing = false;
 let processQueue = [];
+let pendingMerges = [];
 
 const PROVIDERS = ['groq','together','ollama','gemini','claude','openai'];
 const PROVIDER_NAMES = { groq:'Groq (Llama)', together:'Together AI', ollama:'Ollama (Local)', gemini:'Gemini (Google)', claude:'Claude (Anthropic)', openai:'GPT-4o Mini' };
 
-// ─── INIT ────────────────────────────────────────────────────────────────────
+// ─── CONFIG + INIT ────────────────────────────────────────────────────────────
+function getCfg() { return window.CARDSCAN_CONFIG || {}; }
+function setElVal(id, val) { const el = document.getElementById(id); if (el && val) el.value = val; }
+
 (function init() {
+  const cfg = getCfg();
+
+  // 1. Apply config.js defaults first
+  if (cfg.DEFAULT_PROVIDER) activeTab = cfg.DEFAULT_PROVIDER;
+  if (cfg.GROQ_API_KEY)     setElVal('groqKey',     cfg.GROQ_API_KEY);
+  if (cfg.TOGETHER_API_KEY) setElVal('togetherKey', cfg.TOGETHER_API_KEY);
+  if (cfg.GEMINI_API_KEY)   setElVal('geminiKey',   cfg.GEMINI_API_KEY);
+  if (cfg.CLAUDE_API_KEY)   setElVal('claudeKey',   cfg.CLAUDE_API_KEY);
+  if (cfg.OPENAI_API_KEY)   setElVal('openaiKey',   cfg.OPENAI_API_KEY);
+  if (cfg.OLLAMA_URL)       setElVal('ollamaUrl',   cfg.OLLAMA_URL);
+  if (cfg.OLLAMA_MODEL)     setElVal('ollamaModel', cfg.OLLAMA_MODEL);
+
+  // 2. localStorage overrides config.js (manual user settings win)
   const saved = localStorage.getItem('cardscan_keys');
   if (saved) {
     try {
       const k = JSON.parse(saved);
-      if (k.groq)   { const el = document.getElementById('groqKey');     if(el) el.value = k.groq; }
-      if (k.together){ const el = document.getElementById('togetherKey'); if(el) el.value = k.together; }
-      if (k.gemini) { const el = document.getElementById('geminiKey');   if(el) el.value = k.gemini; }
-      if (k.claude) { const el = document.getElementById('claudeKey'); if(el) el.value = k.claude; }
-      if (k.openai) { const el = document.getElementById('openaiKey'); if(el) el.value = k.openai; }
-      if (k.ollamaUrl)   { const el = document.getElementById('ollamaUrl');   if(el) el.value = k.ollamaUrl; }
-      if (k.ollamaModel) { const el = document.getElementById('ollamaModel'); if(el) el.value = k.ollamaModel; }
-      if (k.activeTab) { activeTab = k.activeTab; switchTab(activeTab, true); }
+      if (k.groq)        setElVal('groqKey',     k.groq);
+      if (k.together)    setElVal('togetherKey', k.together);
+      if (k.gemini)      setElVal('geminiKey',   k.gemini);
+      if (k.claude)      setElVal('claudeKey',   k.claude);
+      if (k.openai)      setElVal('openaiKey',   k.openai);
+      if (k.ollamaUrl)   setElVal('ollamaUrl',   k.ollamaUrl);
+      if (k.ollamaModel) setElVal('ollamaModel', k.ollamaModel);
+      if (k.activeTab)   activeTab = k.activeTab;
     } catch(e) {}
   }
+
+  switchTab(activeTab, true);
   updateApiStatus();
   updateNoApiWarning();
+  if (cfg.SHOW_SETTINGS_ON_START) document.getElementById('apiPanel')?.classList.add('open');
 })();
 
 // ─── API PANEL ───────────────────────────────────────────────────────────────
@@ -877,6 +939,8 @@ async function runQueue() {
   document.getElementById('scanLabel').style.display = 'flex';
   document.getElementById('progressWrap').classList.add('visible');
 
+  const batchIds = [...processQueue]; // snapshot of this batch
+
   while (processQueue.length > 0) {
     const id = processQueue.shift();
     const card = cards.find(c => c.id === id);
@@ -902,9 +966,19 @@ async function runQueue() {
   document.getElementById('scanLabel').style.display = 'none';
   document.getElementById('progressWrap').classList.remove('visible');
   document.getElementById('progressBar').style.width = '0%';
-  const done = cards.filter(c => c.status === 'done').length;
+
+  const done = cards.filter(c => c.status === 'done' && !c.isMergedBack).length;
   const err  = cards.filter(c => c.status === 'error').length;
   toast(`Done! ${done} card${done !== 1 ? 's' : ''} extracted${err ? `, ${err} failed` : ''}.`, done > 0 ? 'success' : 'error');
+
+  // Run matching after batch completes
+  const successBatchIds = batchIds.filter(id => {
+    const c = cards.find(x => x.id === id);
+    return c && c.status === 'done';
+  });
+  if (successBatchIds.length > 0) {
+    setTimeout(() => runCardMatching(successBatchIds), 400);
+  }
 }
 
 function updateScanLabel(msg) {
@@ -1309,8 +1383,27 @@ function renderRow(id) {
   const card = cards.find(c => c.id === id);
   if (!card) return;
   let el = document.getElementById('row-' + id);
-  const isNew = !el;
-  if (isNew) {
+
+  // Merged-back cards: collapse to a tiny indicator row, don't show full row
+  if (card.isMergedBack) {
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'row-' + id;
+      el.className = 'card-row';
+      document.getElementById('cardList').appendChild(el);
+    }
+    const intoCard = cards.find(c => c.id === card.mergedInto);
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 18px;opacity:.5;font-size:11px;color:var(--text3);border-left:3px solid #1a4a4a">
+        <img src="${card.preview}" style="width:36px;height:22px;object-fit:cover;border-radius:2px;border:1px solid var(--border2)">
+        <span>Back side — merged into <strong style="color:var(--accent2)">${escHtml(intoCard?.data?.name || intoCard?.data?.company || 'card')}</strong></span>
+        <span class="match-badge merged">merged</span>
+        <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="removeCard('${id}')">✕</button>
+      </div>`;
+    return;
+  }
+
+  if (!el) {
     el = document.createElement('div');
     el.id = 'row-' + id;
     el.className = 'card-row';
@@ -1323,6 +1416,11 @@ function renderRow(id) {
   const company = card.data?.company || '';
   const phone = card.data?.phone || '';
 
+  // Show merged-from badge if this card had back-side merged in
+  const mergedBadge = card.mergedFrom?.length
+    ? `<span class="match-badge merged" title="Has ${card.mergedFrom.length} back-side merged">+back</span>`
+    : '';
+
   const expandFields = FIELDS.filter(f => card.data?.[f]).map(f => `
     <div class="expand-field" style="${f==='address'||f==='notes'?'grid-column:span 2':''}">
       <div class="expand-field-label">${ICONS[f]} ${LABELS[f]}</div>
@@ -1332,7 +1430,7 @@ function renderRow(id) {
   el.innerHTML = `
     <div class="card-summary" onclick="toggleRow('${id}')">
       <img class="card-thumb" src="${card.preview}" alt="" onerror="this.style.display='none'">
-      <div class="card-name">${name}</div>
+      <div class="card-name">${name} ${mergedBadge}</div>
       <div class="card-sub">${escHtml(company)}</div>
       <div class="card-sub">${escHtml(phone)}</div>
       ${statusBadge(card)}
@@ -1345,7 +1443,7 @@ function renderRow(id) {
     ${card.status === 'done' && expandFields ? `
       <div class="card-expand" id="expand-${id}">
         <div class="expand-grid">${expandFields}</div>
-        ${card.error ? `<div style="margin-top:8px;font-size:11px;color:var(--red)">⚠ ${escHtml(card.error)}</div>` : ''}
+        ${card.mergedFrom?.length ? `<div style="margin-top:8px;font-size:11px;color:var(--accent2)">✓ Back-side data merged in (${card.mergedFrom.length} image${card.mergedFrom.length>1?'s':''})</div>` : ''}
       </div>` : ''}
     ${card.status === 'error' ? `
       <div class="card-expand" id="expand-${id}">
@@ -1364,6 +1462,7 @@ function renderAll() {
   const q = document.getElementById('searchInput')?.value?.toLowerCase() || '';
   const f = document.getElementById('filterStatus')?.value || 'all';
   const visible = cards.filter(c => {
+    if (c.isMergedBack) return false; // hidden from main table
     if (f !== 'all' && c.status !== f) return false;
     if (!q) return true;
     return ['name','company','email','phone','title'].some(k => (c.data?.[k] || '').toLowerCase().includes(q));
@@ -1375,11 +1474,13 @@ function renderAll() {
 function renderTable() { renderAll(); }
 
 function updateStats() {
-  const total = cards.length;
-  const done = cards.filter(c => c.status === 'done').length;
-  const proc = cards.filter(c => c.status === 'processing').length;
-  const err = cards.filter(c => c.status === 'error').length;
-  const queued = cards.filter(c => c.status === 'queued').length;
+  const active  = cards.filter(c => !c.isMergedBack);
+  const total   = active.length;
+  const done    = active.filter(c => c.status === 'done').length;
+  const proc    = active.filter(c => c.status === 'processing').length;
+  const err     = active.filter(c => c.status === 'error').length;
+  const queued  = active.filter(c => c.status === 'queued').length;
+  const merged  = cards.filter(c => c.isMergedBack).length;
 
   document.getElementById('statTotal').textContent = total;
   document.getElementById('statDone').textContent = done;
@@ -1387,7 +1488,21 @@ function updateStats() {
   document.getElementById('statErr').textContent = err;
   document.getElementById('statQueued').textContent = queued;
 
-  const show = total > 0;
+  // Show merged count if any
+  let mergedEl = document.getElementById('statMerged');
+  if (merged > 0) {
+    if (!mergedEl) {
+      const statsBar = document.getElementById('statsBar');
+      const div = document.createElement('div');
+      div.className = 'stat';
+      div.innerHTML = `<span class="stat-val" id="statMerged" style="color:var(--accent2)">${merged}</span><span class="stat-label">Merged</span>`;
+      statsBar.appendChild(div);
+    } else {
+      mergedEl.textContent = merged;
+    }
+  }
+
+  const show = total > 0 || merged > 0;
   document.getElementById('statsBar').style.display = show ? 'flex' : 'none';
   document.getElementById('tableWrap').style.display = show ? 'block' : 'none';
   document.getElementById('emptyState').classList.toggle('visible', !show);
@@ -1465,32 +1580,33 @@ function closeModal(e) {
 
 // ─── EXPORT ───────────────────────────────────────────────────────────────────
 function exportExcel() {
-  const done = cards.filter(c => c.status === 'done');
+  // Exclude merged-back cards (they were absorbed into their front-side card)
+  const done = cards.filter(c => c.status === 'done' && !c.isMergedBack);
   if (!done.length) { toast('No extracted cards to export.', 'error'); return; }
 
   const wb = XLSX.utils.book_new();
 
-  // Main data sheet
-  const headers = FIELDS.map(f => LABELS[f]);
-  const rows = done.map(c => FIELDS.map(f => c.data?.[f] || ''));
+  // Main data sheet — add "Source" column to indicate merged cards
+  const headers = [...FIELDS.map(f => LABELS[f]), 'Data Source'];
+  const rows = done.map(c => [
+    ...FIELDS.map(f => c.data?.[f] || ''),
+    c.mergedFrom?.length ? `Front + Back (${c.mergedFrom.length} image merged)` : 'Front side'
+  ]);
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-
-  // Column widths
-  ws['!cols'] = FIELDS.map(f => ({ wch: Math.max(LABELS[f].length + 6, 24) }));
-
-  // Freeze header row
+  ws['!cols'] = [...FIELDS.map(f => ({ wch: Math.max(LABELS[f].length + 6, 24) })), { wch: 28 }];
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-
   XLSX.utils.book_append_sheet(wb, ws, 'Business Cards');
 
   // Summary sheet
+  const merged = cards.filter(c => c.isMergedBack).length;
   const summaryData = [
     ['CardScan Pro — Export Summary'],
     ['Export Date', new Date().toLocaleString()],
-    ['Total Cards Scanned', cards.length],
-    ['Successfully Extracted', done.length],
+    ['Total Images Processed', cards.length],
+    ['Unique Business Cards', done.length],
+    ['Back-sides Merged', merged],
     ['Failed', cards.filter(c => c.status === 'error').length],
-    ['API Provider Used', activeTab.toUpperCase()],
+    ['API Provider Used', PROVIDER_NAMES[activeTab] || activeTab],
   ];
   const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
   ws2['!cols'] = [{ wch: 30 }, { wch: 30 }];
@@ -1499,6 +1615,272 @@ function exportExcel() {
   const date = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `business_cards_${date}.xlsx`);
   toast(`✓ Exported ${done.length} cards to Excel!`, 'success');
+}
+
+
+// ─── CARD MATCHING ENGINE ─────────────────────────────────────────────────────
+// Normalizes text for fuzzy comparison
+function normalize(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Tokenizes into meaningful words, filtering stop words
+function tokenize(s) {
+  const stops = new Set(['the','and','of','in','at','for','a','an','&','pvt','ltd','llc','inc','co','corp','private','limited','mr','ms','dr']);
+  return normalize(s).split(' ').filter(w => w.length > 1 && !stops.has(w));
+}
+
+// Jaccard similarity between two token sets
+function jaccard(a, b) {
+  if (!a.length && !b.length) return 0;
+  const sa = new Set(a), sb = new Set(b);
+  const inter = [...sa].filter(x => sb.has(x)).length;
+  const union = new Set([...sa, ...sb]).size;
+  return union === 0 ? 0 : inter / union;
+}
+
+// Builds a fingerprint object from extracted card data
+function cardFingerprint(data) {
+  if (!data) return null;
+  return {
+    nameTokens:    tokenize(data.name),
+    companyTokens: tokenize(data.company),
+    emailLocal:    (data.email || '').split('@')[0].toLowerCase().replace(/[^a-z0-9]/g,''),
+    phoneDigits:   (data.phone || '').replace(/\D/g,'').slice(-8), // last 8 digits
+    websiteDomain: (data.website || '').toLowerCase().replace(/^https?:\/\/(www\.)?/,'').split('/')[0],
+  };
+}
+
+// Computes match score between two fingerprints (0..1)
+function matchScore(fpA, fpB) {
+  if (!fpA || !fpB) return 0;
+  let score = 0, weights = 0;
+
+  // Company name is the strongest signal
+  const compSim = jaccard(fpA.companyTokens, fpB.companyTokens);
+  score += compSim * 0.40; weights += 0.40;
+
+  // Person name
+  const nameSim = jaccard(fpA.nameTokens, fpB.nameTokens);
+  score += nameSim * 0.30; weights += 0.30;
+
+  // Email local part (e.g. "john.doe" from john.doe@company.com)
+  if (fpA.emailLocal && fpB.emailLocal) {
+    const emailSim = fpA.emailLocal === fpB.emailLocal ? 1 :
+      fpA.emailLocal.includes(fpB.emailLocal) || fpB.emailLocal.includes(fpA.emailLocal) ? 0.7 : 0;
+    score += emailSim * 0.15; weights += 0.15;
+  }
+
+  // Phone last 8 digits
+  if (fpA.phoneDigits && fpB.phoneDigits && fpA.phoneDigits.length >= 6) {
+    score += (fpA.phoneDigits === fpB.phoneDigits ? 1 : 0) * 0.10;
+    weights += 0.10;
+  }
+
+  // Website domain
+  if (fpA.websiteDomain && fpB.websiteDomain && fpA.websiteDomain.length > 3) {
+    score += (fpA.websiteDomain === fpB.websiteDomain ? 1 : 0) * 0.05;
+    weights += 0.05;
+  }
+
+  // Normalize by actual weights used
+  return weights > 0 ? score / weights * (weights / 1.0) : 0;
+}
+
+// Returns fields that newData has but existingData doesn't (for merge preview)
+function getMergeFields(existingData, newData) {
+  const additions = {};
+  for (const f of FIELDS) {
+    const hasExisting = existingData?.[f]?.trim();
+    const hasNew = newData?.[f]?.trim();
+    if (!hasExisting && hasNew) additions[f] = newData[f];
+  }
+  return additions;
+}
+
+// Merges newData into existing card — only fills empty fields, never overwrites
+function mergeCardData(existingData, newData) {
+  const merged = { ...existingData };
+  for (const f of FIELDS) {
+    if (!merged[f]?.trim() && newData[f]?.trim()) {
+      merged[f] = newData[f];
+    }
+  }
+  // Append notes from both sides
+  if (existingData.notes?.trim() && newData.notes?.trim() && existingData.notes !== newData.notes) {
+    merged.notes = existingData.notes + ' | ' + newData.notes;
+  }
+  return merged;
+}
+
+// Main matching function — called after each batch finishes
+// Checks all newly extracted cards against all existing done cards
+function runCardMatching(newCardIds) {
+  const threshold = getCfg().MATCH_THRESHOLD || 0.55;
+  const newCards = cards.filter(c => newCardIds.includes(c.id) && c.status === 'done' && c.data);
+  const existingCards = cards.filter(c => !newCardIds.includes(c.id) && c.status === 'done' && c.data && !c.isMergedBack);
+
+  const found = [];
+  const matchedNewIds = new Set();
+
+  for (const newCard of newCards) {
+    const fpNew = cardFingerprint(newCard.data);
+    let bestMatch = null, bestScore = 0;
+
+    // Check against existing cards first (cross-batch)
+    for (const existing of existingCards) {
+      if (existing.id === newCard.id) continue;
+      const fpEx = cardFingerprint(existing.data);
+      const score = matchScore(fpNew, fpEx);
+      if (score > bestScore && score >= threshold) {
+        bestScore = score;
+        bestMatch = existing;
+      }
+    }
+
+    // Also check within the new batch (both front and back uploaded together)
+    for (const other of newCards) {
+      if (other.id === newCard.id || matchedNewIds.has(other.id)) continue;
+      const fpOther = cardFingerprint(other.data);
+      const score = matchScore(fpNew, fpOther);
+      if (score > bestScore && score >= threshold) {
+        bestScore = score;
+        bestMatch = other;
+      }
+    }
+
+    if (bestMatch && !matchedNewIds.has(newCard.id)) {
+      const additions = getMergeFields(bestMatch.data, newCard.data);
+      const hasNewInfo = Object.keys(additions).length > 0;
+
+      // If the new card has zero new fields to contribute, it's likely a duplicate — still flag
+      found.push({
+        existingId:  bestMatch.id,
+        newId:       newCard.id,
+        confidence:  bestScore,
+        additions,
+        hasNewInfo,
+        mergedData:  mergeCardData(bestMatch.data, newCard.data)
+      });
+      matchedNewIds.add(newCard.id);
+      matchedNewIds.add(bestMatch.id);
+    }
+  }
+
+  if (found.length > 0) {
+    pendingMerges = [...pendingMerges, ...found];
+    showMergeModal();
+  }
+}
+
+// ─── MERGE MODAL UI ───────────────────────────────────────────────────────────
+function showMergeModal() {
+  const list = document.getElementById('mergeList');
+  list.innerHTML = '';
+
+  for (const m of pendingMerges) {
+    const existing = cards.find(c => c.id === m.existingId);
+    const newCard  = cards.find(c => c.id === m.newId);
+    if (!existing || !newCard) continue;
+
+    const pct = Math.round(m.confidence * 100);
+    const barColor = pct >= 80 ? '#44cc44' : pct >= 65 ? '#ffaa44' : '#8888ff';
+
+    const additionRows = Object.entries(m.additions).map(([f, v]) =>
+      `<div class="merge-field-row"><span class="merge-field-key">${LABELS[f]}</span><span class="merge-field-val merge-field-new">+ ${escHtml(v)}</span></div>`
+    ).join('');
+
+    const existingRows = FIELDS.filter(f => existing.data?.[f]).slice(0, 4).map(f =>
+      `<div class="merge-field-row"><span class="merge-field-key">${LABELS[f]}</span><span class="merge-field-val">${escHtml(existing.data[f])}</span></div>`
+    ).join('');
+
+    const el = document.createElement('div');
+    el.className = 'merge-card';
+    el.dataset.mergeId = m.existingId + '__' + m.newId;
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--text1)">
+          ${escHtml(existing.data?.name || existing.data?.company || 'Card')}
+          <span style="color:var(--text3);font-weight:400"> + back side</span>
+        </span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:11px;color:${barColor};font-family:var(--mono)">${pct}% match</span>
+          ${m.hasNewInfo ? `<span style="font-size:10px;color:var(--accent2);background:#0a2a2a;padding:2px 7px;border-radius:3px;border:1px solid #1a4a4a">+${Object.keys(m.additions).length} new fields</span>` : '<span style="font-size:10px;color:var(--text3)">duplicate</span>'}
+        </div>
+      </div>
+      <div class="confidence-bar"><div class="confidence-fill" style="width:${pct}%;background:${barColor}"></div></div>
+      <div class="merge-card-pair">
+        <div class="merge-side">
+          <div class="merge-side-label" style="color:var(--text3)">Existing card</div>
+          <img src="${existing.preview}" style="width:100%;height:44px;object-fit:cover;border-radius:3px;margin-bottom:6px;border:1px solid var(--border2)">
+          ${existingRows}
+        </div>
+        <div class="merge-arrow">→</div>
+        <div class="merge-side">
+          <div class="merge-side-label" style="color:var(--accent2)">New card (will add)</div>
+          <img src="${newCard.preview}" style="width:100%;height:44px;object-fit:cover;border-radius:3px;margin-bottom:6px;border:1px solid var(--border2)">
+          ${additionRows || '<div style="font-size:11px;color:var(--text3);font-style:italic">No new fields to add</div>'}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="dismissMerge('${m.existingId}','${m.newId}')">Keep Separate</button>
+        <button class="btn btn-primary btn-sm" onclick="acceptMerge('${m.existingId}','${m.newId}')">Merge Into Existing</button>
+      </div>`;
+    list.appendChild(el);
+  }
+
+  document.getElementById('mergeModal').classList.add('open');
+}
+
+function acceptMerge(existingId, newId) {
+  const m = pendingMerges.find(x => x.existingId === existingId && x.newId === newId);
+  const existing = cards.find(c => c.id === existingId);
+  const newCard  = cards.find(c => c.id === newId);
+  if (!m || !existing || !newCard) return;
+
+  // Apply merged data to existing card
+  existing.data = m.mergedData;
+  existing.mergedFrom = [...(existing.mergedFrom || []), newId];
+
+  // Mark new card as "merged back" — hide from table but keep data
+  newCard.isMergedBack = true;
+  newCard.mergedInto = existingId;
+
+  renderRow(existingId);
+  renderRow(newId);
+  removeMergeFromModal(existingId, newId);
+  updateStats();
+  toast(`Merged back-side data into "${existing.data?.name || existing.data?.company || 'card'}"`, 'success');
+}
+
+function dismissMerge(existingId, newId) {
+  removeMergeFromModal(existingId, newId);
+}
+
+function removeMergeFromModal(existingId, newId) {
+  pendingMerges = pendingMerges.filter(m => !(m.existingId === existingId && m.newId === newId));
+  const el = document.querySelector(`[data-merge-id="${existingId}__${newId}"]`);
+  if (el) el.remove();
+  if (pendingMerges.length === 0) document.getElementById('mergeModal').classList.remove('open');
+}
+
+function acceptAllMerges() {
+  const toAccept = [...pendingMerges];
+  toAccept.forEach(m => acceptMerge(m.existingId, m.newId));
+  document.getElementById('mergeModal').classList.remove('open');
+}
+
+function dismissAllMerges() {
+  pendingMerges = [];
+  document.getElementById('mergeModal').classList.remove('open');
+}
+
+function closeMergeModal(e) {
+  if (!e || e.target === document.getElementById('mergeModal'))
+    document.getElementById('mergeModal').classList.remove('open');
 }
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
